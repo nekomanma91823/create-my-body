@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { WorkoutSet, Exercise, WorkoutTemplate, ProgressionSuggestion } from "@/app/_lib/types";
+import type { AiProgressionSuggestion } from "@/app/_lib/gemini";
 import { calcEst1RM, getProgressionSuggestion } from "@/app/_lib/calculations";
 
 const FALLBACK_EXERCISES: Exercise[] = [
@@ -40,6 +41,8 @@ export default function WorkoutForm() {
   const [message, setMessage] = useState<string | null>(null);
   const [prevSet, setPrevSet] = useState<WorkoutSet | null>(null);
   const [suggestion, setSuggestion] = useState<ProgressionSuggestion | null>(null);
+  const [aiSuggestion, setAiSuggestion] = useState<AiProgressionSuggestion | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
   const [allWorkouts, setAllWorkouts] = useState<WorkoutSet[]>([]);
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
   const [selectedTemplateName, setSelectedTemplateName] = useState("");
@@ -85,6 +88,7 @@ export default function WorkoutForm() {
       setPrevSet(null);
       setSuggestion(null);
     }
+    setAiSuggestion(null);
 
     const todaySets = allWorkouts.filter(
       (w) => w.exercise === exercise && w.date === date,
@@ -123,6 +127,28 @@ export default function WorkoutForm() {
       setMessage(`エラー: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleAiSuggest() {
+    setAiLoading(true);
+    setAiSuggestion(null);
+    try {
+      const res = await fetch("/api/workouts/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ exercise, date }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      const data: AiProgressionSuggestion = await res.json();
+      setAiSuggestion(data);
+      setWeight(data.targetWeight);
+      setReps(data.targetReps);
+      setRpe(data.targetRPE);
+    } catch (err) {
+      setMessage(`AI提案エラー: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setAiLoading(false);
     }
   }
 
@@ -224,18 +250,41 @@ export default function WorkoutForm() {
 
       {/* Previous session */}
       {prevSet && (
-        <div className="rounded-lg bg-indigo-50 border border-indigo-200 p-4 text-sm">
-          <p className="font-semibold text-indigo-800 mb-1">
-            前回（{prevSet.date}）セット{prevSet.setNumber}
-          </p>
-          <p className="text-indigo-700">
-            {prevSet.weight}kg × {prevSet.reps}回 / RPE {prevSet.rpe} / 推定1RM{" "}
-            {prevSet.est1RM}kg
-          </p>
-          {suggestion && (
-            <p className="mt-1 text-indigo-600 font-medium">
-              💡 {suggestion.reason}
-            </p>
+        <div className="rounded-lg bg-indigo-50 border border-indigo-200 p-4 text-sm space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="font-semibold text-indigo-800">
+                前回（{prevSet.date}）セット{prevSet.setNumber}
+              </p>
+              <p className="text-indigo-700">
+                {prevSet.weight}kg × {prevSet.reps}回 / RPE {prevSet.rpe} / 推定1RM{" "}
+                {prevSet.est1RM}kg
+              </p>
+              {suggestion && !aiSuggestion && (
+                <p className="mt-1 text-indigo-600 font-medium">
+                  💡 {suggestion.reason}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={handleAiSuggest}
+              disabled={aiLoading}
+              className="shrink-0 rounded-lg bg-violet-600 px-2.5 py-1.5 text-white text-xs font-semibold hover:bg-violet-700 disabled:opacity-50 transition-colors"
+            >
+              {aiLoading ? "分析中..." : "✨ AI提案"}
+            </button>
+          </div>
+          {aiSuggestion && (
+            <div className="rounded-lg bg-violet-50 border border-violet-200 p-3">
+              <p className="text-xs font-semibold text-violet-700 mb-1">
+                AI提案 — {aiSuggestion.strategy}
+              </p>
+              <p className="text-sm font-bold text-violet-900">
+                {aiSuggestion.targetWeight}kg × {aiSuggestion.targetReps}回 / RPE {aiSuggestion.targetRPE}
+              </p>
+              <p className="text-xs text-violet-700 mt-1">{aiSuggestion.reasoning}</p>
+            </div>
           )}
         </div>
       )}

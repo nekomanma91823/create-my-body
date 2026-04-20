@@ -1,5 +1,13 @@
 import { GoogleGenAI } from "@google/genai";
-import type { NutritionEstimate } from "./types";
+import type { NutritionEstimate, WorkoutSet } from "./types";
+
+export interface AiProgressionSuggestion {
+  targetWeight: number;
+  targetReps: number;
+  targetRPE: number;
+  strategy: string;
+  reasoning: string;
+}
 
 export interface WeeklyReportInput {
   week: string;
@@ -75,13 +83,41 @@ export async function generateWeeklyReport(input: WeeklyReportInput): Promise<We
 {"summary":"今週全体の簡潔なまとめ（2〜3文）","highlights":["良かった点1","良かった点2"],"improvements":["改善点1","改善点2"],"nextWeekAdvice":"来週へのアドバイス（1〜2文）"}`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash-preview-04-17",
     contents: prompt,
   });
   const text = response.text ?? "";
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("Geminiから有効なJSONを取得できませんでした");
   return JSON.parse(match[0]) as WeeklyReport;
+}
+
+export async function generateProgressionSuggestion(
+  exercise: string,
+  recentSets: WorkoutSet[]
+): Promise<AiProgressionSuggestion> {
+  const ai = getAI();
+  const history = recentSets
+    .slice(0, 10)
+    .map((s) => `${s.date} セット${s.setNumber}: ${s.weight}kg×${s.reps}回 RPE${s.rpe} 推定1RM${s.est1RM}kg`)
+    .join("\n");
+
+  const prompt = `あなたはパーソナルトレーナーです。以下の「${exercise}」の直近セット履歴を分析して、次のセットの最適な提案をしてください。
+
+【履歴（新しい順）】
+${history}
+
+プログレッシブオーバーロードの原則に基づき、JSON形式のみで回答してください（説明不要）:
+{"targetWeight": number, "targetReps": number, "targetRPE": number, "strategy": "戦略の種類（重量増加/回数増加/同重量維持/重量減少）", "reasoning": "具体的な根拠（2〜3文）"}`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash-preview-04-17",
+    contents: prompt,
+  });
+  const text = response.text ?? "";
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("Geminiから有効なJSONを取得できませんでした");
+  return JSON.parse(match[0]) as AiProgressionSuggestion;
 }
 
 export async function estimateNutrition(
@@ -93,7 +129,7 @@ JSON形式のみで返答してください（説明不要）:
 {"caloriesPer100g": number, "proteinPer100g": number, "carbsPer100g": number, "fatPer100g": number}`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash-preview-04-17",
     contents: prompt,
   });
 
