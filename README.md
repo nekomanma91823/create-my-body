@@ -1,36 +1,326 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Create My Body 💪
 
-## Getting Started
+筋トレ記録と栄養管理を統合したダッシュボード型アプリ。
 
-First, run the development server:
+Google Sheets を DB として、Next.js App Router + Recharts で構築。**自分専用の筋肥大管理システム**です。
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+## 🎯 このアプリの工夫点
+
+### 1. **プログレッシブ・オーバーロードの自動判定**
+
+前回のセッション RPE を読み込んで、**次のターゲットを自動提示** します。
+
+```
+前回 RPE ≤ 8 → 重量 +2.5kg を目標
+前回 RPE = 9 → 回数 +1 を目標
+前回 RPE = 10 → 重量据え置き、フォーム安定を狙う
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+入力時に「何をするべきか」が一目瞭然 → 脳の負荷ゼロで記録できます。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 2. **推定 1RM で筋肥大の進捗を定量化**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Epley の式で推定 1RM を自動計算：
 
-## Learn More
+$$Estimated\ 1RM = W \times \left(1 + \frac{R}{30}\right)$$
 
-To learn more about Next.js, take a look at the following resources:
+- 重量は増えていないが 1RM が上昇 → 神経系の適応
+- 1RM も Volume も右肩上がり → 筋肥大の最適化に成功
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 3. **RPE スライダーで運動強度を 0.5 刻みで記録**
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+RPE 8 → あと 2 回できた（楽）
+RPE 9 → あと 1 回できた
+RPE 10 → 限界（全力）
+```
 
-## Deploy on Vercel
+同じ重量・回数でも RPE が下がれば「適応した」証拠 → 伸びしろの判定に使えます。
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 4. **Gemini API で未登録食品の栄養を推定**
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+食事記録で食品が `Foods` マスタになければ、**Gemini 2.0 Flash に栄養を推定させます** 。
+
+```
+ユーザー: 「カツ丼」と入力
+Gemini: 100g あたり 168kcal / 蛋白 6g ... と推定
+ユーザー: ✅ マスタに保存するか選択
+```
+
+### 5. **Gemini AI による週次レポート**
+
+今週のトレーニング・栄養・体重変化データを Gemini に渡し、**自然言語でフィードバック**を生成します。
+
+```
+良かった点: 総ボリュームが先週比 +15%
+改善点: タンパク質摂取が目標の 78%
+来週のアドバイス: 脚のボリュームが少ないため...
+```
+
+### 6. **ワークアウトテンプレート**
+
+テンプレートを選択すると、種目チップが横並びで表示されます。
+
+- クリックで種目・目標 rep 数・RPE が自動入力
+- 目標セット数を達成した種目は打ち消し線で表示
+- 進行中のセット数をリアルタイム反映（例: `2/3`）
+
+### 7. **Google Sheets をデータベースとして使用**
+
+- ✅ 初回アクセス時にシート自動生成
+- ✅ スプレッドシート UI で直接データ閲覧・編集可能
+- ✅ Google ドライブが自動バックアップ
+- ✅ DevOps ゼロ、認証情報だけで動作
+
+### 8. **週次ボリューム × 部位別の積み上げ棒グラフ**
+
+```
+胸    ████████████ 1,200 kg
+背中  ██████████ 950 kg
+脚    ███████████████ 1,450 kg
+```
+
+部位間のバランスが可視化 → オーバーワーク / アンダーワークを検知。
+
+### 9. **体組成の多角的トラッキング**
+
+体重だけでなく、**4部位の周径囲** を記録：
+
+| 項目 | 意味 |
+|---|---|
+| 体重 | 総量の増減 |
+| 体脂肪率 | 品質の判定 |
+| **胸・腕・腿・腹囲** | 部位別の肥大エビデンス |
+| 体調スコア (1-5) | 睡眠・ストレスとの相関分析 |
+
+### 10. **Tempo × RestTime で細部の追跡**
+
+- **Tempo**（例：3-0-1-0）→ エキセントリック時間を明示
+- **RestTime**（例：90 秒）→ インターバルと回数の相関を記録
+
+---
+
+## 📊 データモデル
+
+**7 つのスプレッドシート（正規化構造）**
+
+| シート | 行 | 用途 |
+|---|---|---|
+| `Exercises` | 1-N | 種目マスタ（種目名・部位・カテゴリ） |
+| `WorkoutTemplates` | 1-N | テンプレート（胸の日など） |
+| `Sets` | 1-N | トレーニングログ（日付・種目・重量・回数・RPE・Tempo・RestTime） |
+| `Foods` | 1-N | 食品マスタ（100g あたりの栄養） |
+| `Meals` | 1-N | 食事ログ（日付・食事タイプ・食品・量・計算済みマクロ） |
+| `BodyMetrics` | 1-N | 体組成（体重・体脂肪・周径囲・体調） |
+| `UserSettings` | 1 | ユーザー設定（PFC 目標・維持カロリー） |
+
+---
+
+## 🚀 セットアップ
+
+### 1. GCP サービスアカウント作成（Google Sheets 用）
+
+```bash
+# GCP Console → サービスアカウント
+# JSON キーをダウンロード
+```
+
+### 2. Google Sheets を作成・共有
+
+- Google Drive で新規シート作成
+- サービスアカウントメールを「編集者」として共有
+- シート ID をコピー
+
+### 3. 環境変数を設定
+
+`.env.local` を作成：
+
+```bash
+# Google Sheets API
+GOOGLE_SERVICE_ACCOUNT_EMAIL=your-sa@project.iam.gserviceaccount.com
+GOOGLE_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----\n"
+GOOGLE_SPREADSHEET_ID=your_sheet_id
+
+# Gemini API
+GEMINI_API_KEY=your_gemini_key
+
+# 認証設定（JSON形式、複数人対応）
+AUTH_USERS='[{"email":"your@email.com","password":"your_password"}]'
+
+# JWT 署名用シークレット（openssl rand -base64 32 で生成）
+AUTH_SECRET=your_generated_secret_here
+```
+
+### 4. 起動
+
+```bash
+npm install
+npm run dev
+```
+
+初回アクセス時に全シートが自動作成されます。
+
+---
+
+### 🔐 ログイン
+
+- URL: `http://localhost:3000` → 自動的に `/login` にリダイレクト
+- メールアドレス + パスワードでログイン（JWT Cookie 認証）
+- `AUTH_USERS` に登録されたユーザーのみアクセス可能
+
+---
+
+## 📱 ページ一覧
+
+### `/` — ダッシュボード
+
+- 今週のボリューム・総セット数・種目数
+- 今日の PFC 進捗バー（目標値と比較）
+- 週次ボリューム（部位別）積み上げ棒グラフ（直近 8 週）
+- 強度トレンド（推定 1RM × ボリューム 2 軸、種目切替）
+- 最近のセット一覧（直近 5 件）
+
+### `/log` — セット記録・テンプレート管理
+
+**セット記録タブ**
+- テンプレートセレクタ（種目チップをクリックで自動入力）
+- 日付 / 種目 / 重量 / 回数 / RPE
+- SetNumber 自動採番（同日同種目で +1）
+- 前回比較 → プログレッシブ提案
+- RestTime / Tempo / Notes（任意）
+- ボリューム・推定 1RM プレビュー
+
+**テンプレート管理タブ**
+- 既存テンプレートの一覧表示
+- 新規テンプレート作成・種目追加
+
+### `/meals` — 食事記録
+
+- 今日の PFC 進捗バー（目標値と比較）
+- 今日の食事一覧（食事タイプ別グループ表示、AI 推定バッジ）
+- 食品名入力 → Foods マスタ自動補完
+- 未登録食品 → Gemini で栄養推定 → マスタ保存選択
+- 記録後はリストへ即時反映（ページリロード不要）
+
+### `/body-metrics` — 体組成記録
+
+- 最新値と前回比カード（体重・体脂肪率・腹囲・腕囲）
+- 体重・体脂肪率のトレンドチャート（デュアル Y 軸）
+- 体重（必須）/ 体脂肪率 / 周径囲 4 部位（任意）/ 体調スコア（1-5）
+
+### `/history` — ワークアウト履歴
+
+- 部位フィルター → 種目フィルターの 2 段階絞り込み
+- 日付降順でグループ表示
+- 各セットの重量・回数・RPE・推定 1RM・ボリューム
+- フィルター結果の合計セット数・総ボリューム集計
+
+### `/report` — 週次 AI レポート
+
+- 今週の統計カード（ボリューム・先週比・セッション数・部位別・栄養・体重変化）
+- Gemini ボタンで今週データを分析 → 良かった点・改善点・来週アドバイスを生成
+
+### `/calendar` — アクティビティカレンダー
+
+- 月ナビゲーション（前月 / 次月）
+- 各日に 3 色ドットで記録状況を表示
+  - 藍: トレーニング / 緑: 食事 / 黄: 体組成
+- 月のトレーニング日数を表示
+
+### `/exercises` — 種目管理
+
+- 部位フィルター付き種目一覧
+- 種目名・部位・カテゴリを入力して追加（Google Sheets に即保存）
+- 追加した種目は `/log` のドロップダウンに即反映
+
+### `/settings` — 設定
+
+- 目標摂取カロリー・メンテナンスカロリー（差分から減量/増量を自動判定）
+- P / C / F 目標グラム数
+- マクロバランスをリアルタイムで棒グラフ表示
+- 保存後はダッシュボードと `/meals` の進捗バーに即反映
+
+---
+
+## 🔧 技術スタック
+
+| 層 | 技術 |
+|---|---|
+| **Framework** | Next.js App Router（RSC + Server Actions） |
+| **UI** | React + Tailwind CSS |
+| **Chart** | Recharts（ComposedChart・BarChart・LineChart） |
+| **Database** | Google Sheets API（google-spreadsheet） |
+| **Auth** | JWT Cookie 認証（jose、独自実装） |
+| **AI** | Gemini 2.0 Flash（栄養推定・週次レポート） |
+| **言語** | TypeScript |
+| **PWA** | Web App Manifest（ホーム画面追加対応） |
+
+---
+
+## 🏗️ アーキテクチャの特徴
+
+### サーバー / クライアントの分離
+
+- **データ取得・集計はサーバー（RSC）** で実行 → クライアントに余分な JS を送らない
+- **インタラクション（フォーム・チャート切替）はクライアント**で処理
+- 記録後はローカル state を更新 → ページリロード不要でリストに即反映
+
+### 認証フロー
+
+```
+ログイン → JWT 生成（7日有効）→ httpOnly Cookie に保存
+          → Middleware で全ページの Cookie を検証
+          → Navbar で getCurrentUser() によりメール表示
+```
+
+### Google Sheets 最適化
+
+- `loadInfo()` / `loadHeaderRow()` はインスタンスごとに 1 回のみ実行（重複 API コールを排除）
+- 初回アクセス時にシートが存在しなければ自動生成
+
+---
+
+## 📈 使用例
+
+### シナリオ：プログレッシブ・オーバーロード
+
+```
+月曜日:
+  ✅ Bench Press: 80kg × 8 回 / RPE 8.5
+     → アプリが前回比較 → 「前回 80kg × 6 回 / RPE 9」
+     → 提案: 「今回は質が上がった。次は 82.5kg を目指そう」
+
+水曜日:
+  ✅ Bench Press: 82.5kg × 6 回 / RPE 8.5
+  ✅ 推定 1RM: 104kg（前回 101kg）→ +3kg の 1RM 向上
+```
+
+### シナリオ：週次レポート
+
+```
+日曜日に /report を開く
+  → 今週のデータ: ボリューム 42,500kg（先週比 +8%）、タンパク質平均 162g
+  → 「✨ レポートを生成」をクリック
+  → Gemini: 「良かった点: 脚のボリュームが先週比 +22%
+              改善点: カロリーが目標の 91%、もう少し食べましょう
+              来週: 胸のボリュームを増やすことを推奨」
+```
+
+---
+
+## 🎨 デザイン原則
+
+- **Minimal / モダン** — Tailwind CSS で統一感
+- **Mobile-first** — レスポンシブレイアウト、PWA 対応
+- **数字を視覚化** — チャートで傾向を瞬時に把握
+- **操作を減らす** — 自動計算・提案・補完
+
+---
+
+**このアプリは「自分の身体を測定可能に、意思決定を科学的に」という哲学で設計されました。**
+
+データドリブンな筋トレを楽しんでください 🏋️
+#   c r e a t e - m y - b o d y  
+ 
