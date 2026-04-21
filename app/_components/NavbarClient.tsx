@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { href: "/calendar", label: "カレンダー" },
   { href: "/report", label: "レポート" },
   { href: "/exercises", label: "種目管理" },
+  { href: "/foods", label: "食品マスタ" },
   { href: "/settings", label: "設定" },
 ];
 

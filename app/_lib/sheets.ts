@@ -234,6 +234,30 @@ export async function getFoods(): Promise<Food[]> {
   }));
 }
 
+export async function updateFood(foodName: string, data: Partial<Omit<Food, "foodName">>): Promise<Food> {
+  const sheet = await getSheet("Foods");
+  const rows = await sheet.getRows();
+  const row = rows.find((r) => str(r.get("FoodName")) === foodName);
+  if (!row) throw new Error(`Food "${foodName}" not found`);
+  if (data.caloriesPer100g !== undefined) row.set("CaloriesPer100g", data.caloriesPer100g);
+  if (data.proteinPer100g !== undefined) row.set("ProteinPer100g", data.proteinPer100g);
+  if (data.carbsPer100g !== undefined) row.set("CarbsPer100g", data.carbsPer100g);
+  if (data.fatPer100g !== undefined) row.set("FatPer100g", data.fatPer100g);
+  if (data.fiberPer100g !== undefined) row.set("FiberPer100g", data.fiberPer100g);
+  if (data.sugarPer100g !== undefined) row.set("SugarPer100g", data.sugarPer100g);
+  if (data.sodiumPer100g !== undefined) row.set("SodiumPer100g", data.sodiumPer100g);
+  await row.save();
+  return { foodName, ...data } as Food;
+}
+
+export async function deleteFood(foodName: string): Promise<void> {
+  const sheet = await getSheet("Foods");
+  const rows = await sheet.getRows();
+  const row = rows.find((r) => str(r.get("FoodName")) === foodName);
+  if (!row) throw new Error(`Food "${foodName}" not found`);
+  await row.delete();
+}
+
 export async function addFood(data: Food): Promise<Food> {
   const sheet = await getSheet("Foods");
   await sheet.addRow({
