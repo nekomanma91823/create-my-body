@@ -41,6 +41,9 @@ const SHEET_CONFIGS: Record<string, string[]> = {
     "ProteinPer100g",
     "CarbsPer100g",
     "FatPer100g",
+    "FiberPer100g",
+    "SugarPer100g",
+    "SodiumPer100g",
   ],
   Meals: [
     "Date",
@@ -51,6 +54,9 @@ const SHEET_CONFIGS: Record<string, string[]> = {
     "Protein",
     "Carbs",
     "Fat",
+    "Fiber",
+    "Sugar",
+    "Sodium",
     "Source",
   ],
   BodyMetrics: [
@@ -222,6 +228,9 @@ export async function getFoods(): Promise<Food[]> {
     proteinPer100g: num(r.get("ProteinPer100g")),
     carbsPer100g: num(r.get("CarbsPer100g")),
     fatPer100g: num(r.get("FatPer100g")),
+    fiberPer100g: r.get("FiberPer100g") ? num(r.get("FiberPer100g")) : undefined,
+    sugarPer100g: r.get("SugarPer100g") ? num(r.get("SugarPer100g")) : undefined,
+    sodiumPer100g: r.get("SodiumPer100g") ? num(r.get("SodiumPer100g")) : undefined,
   }));
 }
 
@@ -233,6 +242,9 @@ export async function addFood(data: Food): Promise<Food> {
     ProteinPer100g: data.proteinPer100g,
     CarbsPer100g: data.carbsPer100g,
     FatPer100g: data.fatPer100g,
+    FiberPer100g: data.fiberPer100g ?? "",
+    SugarPer100g: data.sugarPer100g ?? "",
+    SodiumPer100g: data.sodiumPer100g ?? "",
   });
   return data;
 }
@@ -250,6 +262,9 @@ export async function getMeals(): Promise<Meal[]> {
     protein: num(r.get("Protein")),
     carbs: num(r.get("Carbs")),
     fat: num(r.get("Fat")),
+    fiber: r.get("Fiber") ? num(r.get("Fiber")) : undefined,
+    sugar: r.get("Sugar") ? num(r.get("Sugar")) : undefined,
+    sodium: r.get("Sodium") ? num(r.get("Sodium")) : undefined,
     source: str(r.get("Source")) as Meal["source"],
   }));
 }
@@ -265,6 +280,9 @@ export async function addMeal(data: Meal): Promise<Meal> {
     Protein: data.protein,
     Carbs: data.carbs,
     Fat: data.fat,
+    Fiber: data.fiber ?? "",
+    Sugar: data.sugar ?? "",
+    Sodium: data.sodium ?? "",
     Source: data.source,
   });
   return data;

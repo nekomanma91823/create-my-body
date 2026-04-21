@@ -126,7 +126,8 @@ export async function estimateNutrition(
   const ai = getAI();
   const prompt = `「${foodName}」の栄養成分を100gあたりで推定してください。
 JSON形式のみで返答してください（説明不要）:
-{"caloriesPer100g": number, "proteinPer100g": number, "carbsPer100g": number, "fatPer100g": number}`;
+{"caloriesPer100g": number, "proteinPer100g": number, "carbsPer100g": number, "fatPer100g": number, "fiberPer100g": number, "sugarPer100g": number, "sodiumPer100g": number}
+※ sodiumPer100g は食塩相当量(g)で返してください。`;
 
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash-preview-04-17",
@@ -143,5 +144,8 @@ JSON形式のみで返答してください（説明不要）:
     proteinPer100g: Math.round(parsed.proteinPer100g * 10) / 10,
     carbsPer100g: Math.round(parsed.carbsPer100g * 10) / 10,
     fatPer100g: Math.round(parsed.fatPer100g * 10) / 10,
+    fiberPer100g: parsed.fiberPer100g != null ? Math.round(parsed.fiberPer100g * 10) / 10 : undefined,
+    sugarPer100g: parsed.sugarPer100g != null ? Math.round(parsed.sugarPer100g * 10) / 10 : undefined,
+    sodiumPer100g: parsed.sodiumPer100g != null ? Math.round(parsed.sodiumPer100g * 100) / 100 : undefined,
   };
 }

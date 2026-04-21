@@ -12,6 +12,9 @@ function calcMacros(per100g: NutritionEstimate, amount: number) {
     protein: Math.round(per100g.proteinPer100g * r * 10) / 10,
     carbs: Math.round(per100g.carbsPer100g * r * 10) / 10,
     fat: Math.round(per100g.fatPer100g * r * 10) / 10,
+    fiber: per100g.fiberPer100g != null ? Math.round(per100g.fiberPer100g * r * 10) / 10 : undefined,
+    sugar: per100g.sugarPer100g != null ? Math.round(per100g.sugarPer100g * r * 10) / 10 : undefined,
+    sodium: per100g.sodiumPer100g != null ? Math.round(per100g.sodiumPer100g * r * 100) / 100 : undefined,
   };
 }
 
@@ -92,7 +95,15 @@ export default function MealForm({ onMealAdded }: Props) {
   const source = matched ? "master" : estimate ? "gemini" : null;
   const nutrition =
     matched
-      ? { caloriesPer100g: matched.caloriesPer100g, proteinPer100g: matched.proteinPer100g, carbsPer100g: matched.carbsPer100g, fatPer100g: matched.fatPer100g }
+      ? {
+          caloriesPer100g: matched.caloriesPer100g,
+          proteinPer100g: matched.proteinPer100g,
+          carbsPer100g: matched.carbsPer100g,
+          fatPer100g: matched.fatPer100g,
+          fiberPer100g: matched.fiberPer100g,
+          sugarPer100g: matched.sugarPer100g,
+          sodiumPer100g: matched.sodiumPer100g,
+        }
       : estimate ?? null;
   const macros = nutrition ? calcMacros(nutrition, amount) : null;
 
@@ -210,7 +221,10 @@ export default function MealForm({ onMealAdded }: Props) {
           {estimate && showSaveToMaster && (
             <div className="mt-3 flex items-center gap-3">
               <p className="text-xs text-amber-700">
-                {estimate.caloriesPer100g}kcal / P{estimate.proteinPer100g}g / C{estimate.carbsPer100g}g / F{estimate.fatPer100g}g（per 100g）
+                {estimate.caloriesPer100g}kcal / P{estimate.proteinPer100g}g / C{estimate.carbsPer100g}g / F{estimate.fatPer100g}g
+                {estimate.fiberPer100g != null && ` / 食物繊維${estimate.fiberPer100g}g`}
+                {estimate.sodiumPer100g != null && ` / 食塩${estimate.sodiumPer100g}g`}
+                （per 100g）
               </p>
               <button
                 type="button"
@@ -239,11 +253,26 @@ export default function MealForm({ onMealAdded }: Props) {
 
       {/* Macros preview */}
       {macros && (
-        <div className="rounded-lg bg-zinc-50 border border-zinc-200 p-4 grid grid-cols-4 gap-3 text-sm">
-          <MacroCard label="カロリー" value={`${macros.calories} kcal`} />
-          <MacroCard label="タンパク質" value={`${macros.protein} g`} color="text-indigo-600" />
-          <MacroCard label="炭水化物" value={`${macros.carbs} g`} color="text-amber-600" />
-          <MacroCard label="脂質" value={`${macros.fat} g`} color="text-red-500" />
+        <div className="rounded-lg bg-zinc-50 border border-zinc-200 p-4 space-y-3 text-sm">
+          <div className="grid grid-cols-4 gap-3">
+            <MacroCard label="カロリー" value={`${macros.calories} kcal`} />
+            <MacroCard label="タンパク質" value={`${macros.protein} g`} color="text-indigo-600" />
+            <MacroCard label="炭水化物" value={`${macros.carbs} g`} color="text-amber-600" />
+            <MacroCard label="脂質" value={`${macros.fat} g`} color="text-red-500" />
+          </div>
+          {(macros.fiber != null || macros.sugar != null || macros.sodium != null) && (
+            <div className="grid grid-cols-3 gap-3 pt-2 border-t border-zinc-200">
+              {macros.fiber != null && (
+                <MacroCard label="食物繊維" value={`${macros.fiber} g`} color="text-emerald-600" />
+              )}
+              {macros.sugar != null && (
+                <MacroCard label="糖質" value={`${macros.sugar} g`} color="text-orange-500" />
+              )}
+              {macros.sodium != null && (
+                <MacroCard label="食塩相当量" value={`${macros.sodium} g`} color="text-cyan-600" />
+              )}
+            </div>
+          )}
         </div>
       )}
 

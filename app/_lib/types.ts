@@ -34,6 +34,9 @@ export interface Food {
   proteinPer100g: number;
   carbsPer100g: number;
   fatPer100g: number;
+  fiberPer100g?: number;
+  sugarPer100g?: number;
+  sodiumPer100g?: number;
 }
 
 export interface Meal {
@@ -45,6 +48,9 @@ export interface Meal {
   protein: number;
   carbs: number;
   fat: number;
+  fiber?: number;
+  sugar?: number;
+  sodium?: number;
   source: "master" | "gemini" | "manual";
 }
 

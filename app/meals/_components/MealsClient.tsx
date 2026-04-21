@@ -20,8 +20,11 @@ export default function MealsClient({ initialMeals, settings }: Props) {
       protein: acc.protein + m.protein,
       carbs: acc.carbs + m.carbs,
       fat: acc.fat + m.fat,
+      fiber: acc.fiber + (m.fiber ?? 0),
+      sugar: acc.sugar + (m.sugar ?? 0),
+      sodium: acc.sodium + (m.sodium ?? 0),
     }),
-    { calories: 0, protein: 0, carbs: 0, fat: 0 },
+    { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0, sodium: 0 },
   );
 
   const grouped = MEAL_TYPE_ORDER.reduce<Record<string, Meal[]>>((acc, type) => {
@@ -74,6 +77,37 @@ export default function MealsClient({ initialMeals, settings }: Props) {
             barColor="bg-red-400"
           />
         </div>
+        {totals.fiber + totals.sugar + totals.sodium > 0 && (
+          <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-zinc-100">
+            {totals.fiber > 0 && (
+              <NutritionBar
+                label="食物繊維"
+                current={Math.round(totals.fiber * 10) / 10}
+                unit="g"
+                color="text-emerald-600"
+                barColor="bg-emerald-400"
+              />
+            )}
+            {totals.sugar > 0 && (
+              <NutritionBar
+                label="糖質"
+                current={Math.round(totals.sugar * 10) / 10}
+                unit="g"
+                color="text-orange-500"
+                barColor="bg-orange-400"
+              />
+            )}
+            {totals.sodium > 0 && (
+              <NutritionBar
+                label="食塩相当量"
+                current={Math.round(totals.sodium * 100) / 100}
+                unit="g"
+                color="text-cyan-600"
+                barColor="bg-cyan-400"
+              />
+            )}
+          </div>
+        )}
         {!settings && (
           <p className="mt-3 text-xs text-zinc-400">
             目標値を設定すると進捗バーが表示されます
@@ -111,9 +145,15 @@ export default function MealsClient({ initialMeals, settings }: Props) {
                           {Math.round(m.calories)} kcal
                         </span>
                         <span className="ml-2">
-                          P{Math.round(m.protein * 10) / 10} C{Math.round(m.carbs * 10) / 10} F
-                          {Math.round(m.fat * 10) / 10}
+                          P{Math.round(m.protein * 10) / 10} C{Math.round(m.carbs * 10) / 10} F{Math.round(m.fat * 10) / 10}
                         </span>
+                        {(m.fiber != null || m.sodium != null) && (
+                          <span className="ml-2 text-zinc-400">
+                            {m.fiber != null && `繊維${Math.round(m.fiber * 10) / 10}g`}
+                            {m.fiber != null && m.sodium != null && " "}
+                            {m.sodium != null && `塩${Math.round(m.sodium * 100) / 100}g`}
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}
