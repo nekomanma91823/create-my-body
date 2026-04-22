@@ -22,6 +22,11 @@ interface Props {
   onMealAdded?: (meal: Meal) => void;
 }
 
+const MANUAL_EMPTY = {
+  calories: 0, protein: 0, carbs: 0, fat: 0,
+  fiber: "", sugar: "", sodium: "",
+};
+
 export default function MealForm({ onMealAdded }: Props) {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [mealType, setMealType] = useState<Meal["mealType"]>("朝食");
@@ -32,6 +37,8 @@ export default function MealForm({ onMealAdded }: Props) {
   const [estimate, setEstimate] = useState<NutritionEstimate | null>(null);
   const [estimating, setEstimating] = useState(false);
   const [showSaveToMaster, setShowSaveToMaster] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
+  const [manual, setManual] = useState(MANUAL_EMPTY);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Food[]>([]);
@@ -49,6 +56,7 @@ export default function MealForm({ onMealAdded }: Props) {
       setSuggestions([]);
       setMatched(null);
       setEstimate(null);
+      setManualMode(false);
       return;
     }
     const q = foodName.trim().toLowerCase();
@@ -92,7 +100,7 @@ export default function MealForm({ onMealAdded }: Props) {
     setMessage("Foodsマスタに追加しました");
   }
 
-  const source = matched ? "master" : estimate ? "gemini" : null;
+  const source = matched ? "master" : manualMode ? "manual" : estimate ? "gemini" : null;
   const nutrition =
     matched
       ? {
@@ -105,7 +113,19 @@ export default function MealForm({ onMealAdded }: Props) {
           sodiumPer100g: matched.sodiumPer100g,
         }
       : estimate ?? null;
-  const macros = nutrition ? calcMacros(nutrition, amount) : null;
+  const macros = manualMode
+    ? {
+        calories: manual.calories,
+        protein: manual.protein,
+        carbs: manual.carbs,
+        fat: manual.fat,
+        fiber: manual.fiber !== "" ? Number(manual.fiber) : undefined,
+        sugar: manual.sugar !== "" ? Number(manual.sugar) : undefined,
+        sodium: manual.sodium !== "" ? Number(manual.sodium) : undefined,
+      }
+    : nutrition
+      ? calcMacros(nutrition, amount)
+      : null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -133,6 +153,8 @@ export default function MealForm({ onMealAdded }: Props) {
       setAmount(100);
       setMatched(null);
       setEstimate(null);
+      setManualMode(false);
+      setManual(MANUAL_EMPTY);
     } catch (e) {
       setMessage(`エラー: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -204,22 +226,33 @@ export default function MealForm({ onMealAdded }: Props) {
         )}
       </div>
 
-      {/* Gemini estimate button */}
+      {/* Gemini estimate / manual input */}
       {foodName.trim() && !matched && (
-        <div className="rounded-lg bg-amber-50 border border-amber-200 p-4">
-          <p className="text-sm text-amber-800 mb-2">
+        <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 space-y-3">
+          <p className="text-sm text-amber-800">
             「{foodName.trim()}」はFoodsマスタに未登録です
           </p>
-          <button
-            type="button"
-            onClick={handleEstimate}
-            disabled={estimating}
-            className="rounded-lg bg-amber-500 px-4 py-2 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50"
-          >
-            {estimating ? "Geminiで推定中..." : "✨ Geminiで栄養を推定"}
-          </button>
-          {estimate && showSaveToMaster && (
-            <div className="mt-3 flex items-center gap-3">
+          {!manualMode && (
+            <div className="flex gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={handleEstimate}
+                disabled={estimating}
+                className="rounded-lg bg-amber-500 px-4 py-2 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50"
+              >
+                {estimating ? "Geminiで推定中..." : "✨ Geminiで栄養を推定"}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setManualMode(true); setEstimate(null); }}
+                className="rounded-lg bg-white border border-amber-400 px-4 py-2 text-amber-700 text-sm font-medium hover:bg-amber-50"
+              >
+                ✏️ 手動で入力
+              </button>
+            </div>
+          )}
+          {estimate && showSaveToMaster && !manualMode && (
+            <div className="flex items-center gap-3">
               <p className="text-xs text-amber-700">
                 {estimate.caloriesPer100g}kcal / P{estimate.proteinPer100g}g / C{estimate.carbsPer100g}g / F{estimate.fatPer100g}g
                 {estimate.fiberPer100g != null && ` / 食物繊維${estimate.fiberPer100g}g`}
@@ -229,7 +262,7 @@ export default function MealForm({ onMealAdded }: Props) {
               <button
                 type="button"
                 onClick={handleSaveToMaster}
-                className="rounded-lg bg-white border border-amber-400 px-3 py-1 text-amber-700 text-xs font-medium hover:bg-amber-50"
+                className="shrink-0 rounded-lg bg-white border border-amber-400 px-3 py-1 text-amber-700 text-xs font-medium hover:bg-amber-50"
               >
                 マスタに保存
               </button>
@@ -238,18 +271,47 @@ export default function MealForm({ onMealAdded }: Props) {
         </div>
       )}
 
-      {/* Amount */}
-      <div>
-        <label className="block text-sm font-medium text-zinc-700 mb-1">量 (g)</label>
-        <input
-          type="number"
-          min={1}
-          step={1}
-          value={amount}
-          onChange={(e) => setAmount(parseInt(e.target.value))}
-          className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
-      </div>
+      {/* 手動栄養素入力フォーム */}
+      {manualMode && (
+        <div className="rounded-lg bg-zinc-50 border border-zinc-300 p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-zinc-700">栄養素を直接入力（摂取量の合計）</p>
+            <button
+              type="button"
+              onClick={() => setManualMode(false)}
+              className="text-xs text-zinc-400 hover:text-zinc-600"
+            >
+              ✕ キャンセル
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <ManualField label="カロリー (kcal)" value={manual.calories} onChange={(v) => setManual((p) => ({ ...p, calories: Number(v) }))} required />
+            <ManualField label="タンパク質 (g)" value={manual.protein} onChange={(v) => setManual((p) => ({ ...p, protein: Number(v) }))} required />
+            <ManualField label="炭水化物 (g)" value={manual.carbs} onChange={(v) => setManual((p) => ({ ...p, carbs: Number(v) }))} required />
+            <ManualField label="脂質 (g)" value={manual.fat} onChange={(v) => setManual((p) => ({ ...p, fat: Number(v) }))} required />
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <ManualField label="食物繊維 (g)" value={manual.fiber} onChange={(v) => setManual((p) => ({ ...p, fiber: v }))} />
+            <ManualField label="糖質 (g)" value={manual.sugar} onChange={(v) => setManual((p) => ({ ...p, sugar: v }))} />
+            <ManualField label="食塩相当量 (g)" value={manual.sodium} onChange={(v) => setManual((p) => ({ ...p, sodium: v }))} step={0.01} />
+          </div>
+        </div>
+      )}
+
+      {/* Amount (hidden in manual mode) */}
+      {!manualMode && (
+        <div>
+          <label className="block text-sm font-medium text-zinc-700 mb-1">量 (g)</label>
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={amount}
+            onChange={(e) => setAmount(parseInt(e.target.value))}
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+      )}
 
       {/* Macros preview */}
       {macros && (
@@ -298,6 +360,39 @@ function MacroCard({ label, value, color = "text-zinc-800" }: { label: string; v
     <div className="text-center">
       <p className="text-zinc-500 text-xs mb-0.5">{label}</p>
       <p className={`font-bold text-sm ${color}`}>{value}</p>
+    </div>
+  );
+}
+
+function ManualField({
+  label,
+  value,
+  onChange,
+  required = false,
+  step = 0.1,
+}: {
+  label: string;
+  value: number | string;
+  onChange: (v: string) => void;
+  required?: boolean;
+  step?: number;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-zinc-600 mb-1">
+        {label}
+        {!required && <span className="ml-1 text-zinc-400">（任意）</span>}
+      </label>
+      <input
+        type="number"
+        min={0}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="0"
+        required={required}
+        className="w-full rounded-lg border border-zinc-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      />
     </div>
   );
 }

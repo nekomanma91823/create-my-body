@@ -43,12 +43,17 @@ function getAI() {
   return new GoogleGenAI({ apiKey });
 }
 
-export async function generateWeeklyReport(input: WeeklyReportInput): Promise<WeeklyReport> {
+export async function generateWeeklyReport(
+  input: WeeklyReportInput,
+): Promise<WeeklyReport> {
   const ai = getAI();
   const { training, nutrition, body, week } = input;
   const volumeChange =
     training.prevVolume > 0
-      ? Math.round(((training.totalVolume - training.prevVolume) / training.prevVolume) * 100)
+      ? Math.round(
+          ((training.totalVolume - training.prevVolume) / training.prevVolume) *
+            100,
+        )
       : null;
   const byMuscleStr = Object.entries(training.byMuscle)
     .map(([g, v]) => `${g} ${v.toLocaleString()}kg`)
@@ -83,7 +88,7 @@ export async function generateWeeklyReport(input: WeeklyReportInput): Promise<We
 {"summary":"今週全体の簡潔なまとめ（2〜3文）","highlights":["良かった点1","良かった点2"],"improvements":["改善点1","改善点2"],"nextWeekAdvice":"来週へのアドバイス（1〜2文）"}`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-preview-04-17",
+    model: "gemini-3-flash-preview",
     contents: prompt,
   });
   const text = response.text ?? "";
@@ -94,12 +99,15 @@ export async function generateWeeklyReport(input: WeeklyReportInput): Promise<We
 
 export async function generateProgressionSuggestion(
   exercise: string,
-  recentSets: WorkoutSet[]
+  recentSets: WorkoutSet[],
 ): Promise<AiProgressionSuggestion> {
   const ai = getAI();
   const history = recentSets
     .slice(0, 10)
-    .map((s) => `${s.date} セット${s.setNumber}: ${s.weight}kg×${s.reps}回 RPE${s.rpe} 推定1RM${s.est1RM}kg`)
+    .map(
+      (s) =>
+        `${s.date} セット${s.setNumber}: ${s.weight}kg×${s.reps}回 RPE${s.rpe} 推定1RM${s.est1RM}kg`,
+    )
     .join("\n");
 
   const prompt = `あなたはパーソナルトレーナーです。以下の「${exercise}」の直近セット履歴を分析して、次のセットの最適な提案をしてください。
@@ -111,7 +119,7 @@ ${history}
 {"targetWeight": number, "targetReps": number, "targetRPE": number, "strategy": "戦略の種類（重量増加/回数増加/同重量維持/重量減少）", "reasoning": "具体的な根拠（2〜3文）"}`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-preview-04-17",
+    model: "gemini-3-flash-preview",
     contents: prompt,
   });
   const text = response.text ?? "";
@@ -121,7 +129,7 @@ ${history}
 }
 
 export async function estimateNutrition(
-  foodName: string
+  foodName: string,
 ): Promise<NutritionEstimate> {
   const ai = getAI();
   const prompt = `「${foodName}」の栄養成分を100gあたりで推定してください。
@@ -130,7 +138,7 @@ JSON形式のみで返答してください（説明不要）:
 ※ sodiumPer100g は食塩相当量(g)で返してください。`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-preview-04-17",
+    model: "gemini-3-flash-preview",
     contents: prompt,
   });
 
@@ -144,8 +152,17 @@ JSON形式のみで返答してください（説明不要）:
     proteinPer100g: Math.round(parsed.proteinPer100g * 10) / 10,
     carbsPer100g: Math.round(parsed.carbsPer100g * 10) / 10,
     fatPer100g: Math.round(parsed.fatPer100g * 10) / 10,
-    fiberPer100g: parsed.fiberPer100g != null ? Math.round(parsed.fiberPer100g * 10) / 10 : undefined,
-    sugarPer100g: parsed.sugarPer100g != null ? Math.round(parsed.sugarPer100g * 10) / 10 : undefined,
-    sodiumPer100g: parsed.sodiumPer100g != null ? Math.round(parsed.sodiumPer100g * 100) / 100 : undefined,
+    fiberPer100g:
+      parsed.fiberPer100g != null
+        ? Math.round(parsed.fiberPer100g * 10) / 10
+        : undefined,
+    sugarPer100g:
+      parsed.sugarPer100g != null
+        ? Math.round(parsed.sugarPer100g * 10) / 10
+        : undefined,
+    sodiumPer100g:
+      parsed.sodiumPer100g != null
+        ? Math.round(parsed.sodiumPer100g * 100) / 100
+        : undefined,
   };
 }
