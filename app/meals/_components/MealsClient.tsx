@@ -23,8 +23,9 @@ export default function MealsClient({ initialMeals, settings }: Props) {
       fiber: acc.fiber + (m.fiber ?? 0),
       sugar: acc.sugar + (m.sugar ?? 0),
       sodium: acc.sodium + (m.sodium ?? 0),
+      alcohol: acc.alcohol + (m.alcohol ?? 0),
     }),
-    { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0, sodium: 0 },
+    { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0, sodium: 0, alcohol: 0 },
   );
 
   const grouped = MEAL_TYPE_ORDER.reduce<Record<string, Meal[]>>((acc, type) => {
@@ -77,8 +78,8 @@ export default function MealsClient({ initialMeals, settings }: Props) {
             barColor="bg-red-400"
           />
         </div>
-        {totals.fiber + totals.sugar + totals.sodium > 0 && (
-          <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-zinc-100">
+        {totals.fiber + totals.sugar + totals.sodium + totals.alcohol > 0 && (
+          <div className="grid grid-cols-4 gap-4 mt-4 pt-4 border-t border-zinc-100">
             {totals.fiber > 0 && (
               <NutritionBar
                 label="食物繊維"
@@ -104,6 +105,15 @@ export default function MealsClient({ initialMeals, settings }: Props) {
                 unit="g"
                 color="text-cyan-600"
                 barColor="bg-cyan-400"
+              />
+            )}
+            {totals.alcohol > 0 && (
+              <NutritionBar
+                label="アルコール"
+                current={Math.round(totals.alcohol * 10) / 10}
+                unit="g"
+                color="text-purple-600"
+                barColor="bg-purple-400"
               />
             )}
           </div>
@@ -147,11 +157,13 @@ export default function MealsClient({ initialMeals, settings }: Props) {
                         <span className="ml-2">
                           P{Math.round(m.protein * 10) / 10} C{Math.round(m.carbs * 10) / 10} F{Math.round(m.fat * 10) / 10}
                         </span>
-                        {(m.fiber != null || m.sodium != null) && (
+                        {(m.fiber != null || m.sodium != null || m.alcohol != null) && (
                           <span className="ml-2 text-zinc-400">
                             {m.fiber != null && `繊維${Math.round(m.fiber * 10) / 10}g`}
                             {m.fiber != null && m.sodium != null && " "}
                             {m.sodium != null && `塩${Math.round(m.sodium * 100) / 100}g`}
+                            {m.alcohol != null && (m.fiber != null || m.sodium != null) && " "}
+                            {m.alcohol != null && `酒${Math.round(m.alcohol * 10) / 10}g`}
                           </span>
                         )}
                       </div>

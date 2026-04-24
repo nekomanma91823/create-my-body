@@ -37,6 +37,7 @@ export interface Food {
   fiberPer100g?: number;
   sugarPer100g?: number;
   sodiumPer100g?: number;
+  alcoholPer100g?: number;
 }
 
 export interface Meal {
@@ -51,6 +52,7 @@ export interface Meal {
   fiber?: number;
   sugar?: number;
   sodium?: number;
+  alcohol?: number;
   source: "master" | "gemini" | "manual";
 }
 

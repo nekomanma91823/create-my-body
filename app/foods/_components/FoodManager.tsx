@@ -15,6 +15,7 @@ const EMPTY_FORM: Omit<Food, "foodName"> = {
   fiberPer100g: undefined,
   sugarPer100g: undefined,
   sodiumPer100g: undefined,
+  alcoholPer100g: undefined,
 };
 
 export default function FoodManager({ initialFoods }: Props) {
@@ -43,6 +44,7 @@ export default function FoodManager({ initialFoods }: Props) {
       fiberPer100g: food.fiberPer100g,
       sugarPer100g: food.sugarPer100g,
       sodiumPer100g: food.sodiumPer100g,
+      alcoholPer100g: food.alcoholPer100g,
     });
     setAddMode(false);
     setMessage(null);
@@ -171,10 +173,11 @@ export default function FoodManager({ initialFoods }: Props) {
             <NumInput label="炭水化物 (g)" value={form.carbsPer100g} onChange={(v) => numField("carbsPer100g", v)} />
             <NumInput label="脂質 (g)" value={form.fatPer100g} onChange={(v) => numField("fatPer100g", v)} />
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <NumInput label="食物繊維 (g)" value={form.fiberPer100g} onChange={(v) => numField("fiberPer100g", v)} optional />
             <NumInput label="糖質 (g)" value={form.sugarPer100g} onChange={(v) => numField("sugarPer100g", v)} optional />
             <NumInput label="食塩相当量 (g)" value={form.sodiumPer100g} onChange={(v) => numField("sodiumPer100g", v)} optional />
+            <NumInput label="アルコール (g)" value={form.alcoholPer100g} onChange={(v) => numField("alcoholPer100g", v)} optional />
           </div>
 
           <div className="flex gap-2 pt-2">
@@ -232,6 +235,7 @@ export default function FoodManager({ initialFoods }: Props) {
                     {food.fiberPer100g != null && ` / 食物繊維${food.fiberPer100g}g`}
                     {food.sugarPer100g != null && ` / 糖質${food.sugarPer100g}g`}
                     {food.sodiumPer100g != null && ` / 食塩${food.sodiumPer100g}g`}
+                    {food.alcoholPer100g != null && ` / アルコール${food.alcoholPer100g}g`}
                   </p>
                 </div>
                 <div className="flex gap-1.5 shrink-0">

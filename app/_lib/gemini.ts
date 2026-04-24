@@ -1,6 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import type { NutritionEstimate, WorkoutSet } from "./types";
 
+const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash-preview-04-17";
+
 export interface AiProgressionSuggestion {
   targetWeight: number;
   targetReps: number;
@@ -88,7 +90,7 @@ export async function generateWeeklyReport(
 {"summary":"今週全体の簡潔なまとめ（2〜3文）","highlights":["良かった点1","良かった点2"],"improvements":["改善点1","改善点2"],"nextWeekAdvice":"来週へのアドバイス（1〜2文）"}`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: GEMINI_MODEL,
     contents: prompt,
   });
   const text = response.text ?? "";
@@ -105,6 +107,7 @@ export interface ParsedNutritionLabel {
   fiber?: number;
   sugar?: number;
   sodium?: number;
+  alcohol?: number;
   per: "100g" | "serving";
   servingSize?: string;
 }
@@ -120,13 +123,14 @@ ${text}
 - per は "100g" または "serving"（1食分・1枚など）のどちらを基準にしているか
 - servingSize は1食分の場合の量（例: "1枚(60g)"）、100g基準なら null
 - sodium は食塩相当量(g)。ナトリウム(mg)が記載されている場合は 食塩相当量 = Na(mg)×2.54÷1000 で変換
+- alcohol は純アルコール量(g)。記載がなければ null
 - 記載がない項目は null
 
 JSON形式のみで返答（説明不要）:
-{"calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number|null, "sugar": number|null, "sodium": number|null, "per": "100g"|"serving", "servingSize": string|null}`;
+{"calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number|null, "sugar": number|null, "sodium": number|null, "alcohol": number|null, "per": "100g"|"serving", "servingSize": string|null}`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-preview-04-17",
+    model: GEMINI_MODEL,
     contents: prompt,
   });
   const text2 = response.text ?? "";
@@ -141,6 +145,7 @@ JSON形式のみで返答（説明不要）:
     fiber: parsed.fiber != null ? Math.round(parsed.fiber * 10) / 10 : undefined,
     sugar: parsed.sugar != null ? Math.round(parsed.sugar * 10) / 10 : undefined,
     sodium: parsed.sodium != null ? Math.round(parsed.sodium * 100) / 100 : undefined,
+    alcohol: parsed.alcohol != null ? Math.round(parsed.alcohol * 10) / 10 : undefined,
     per: parsed.per ?? "serving",
     servingSize: parsed.servingSize ?? undefined,
   };
@@ -168,7 +173,7 @@ ${history}
 {"targetWeight": number, "targetReps": number, "targetRPE": number, "strategy": "戦略の種類（重量増加/回数増加/同重量維持/重量減少）", "reasoning": "具体的な根拠（2〜3文）"}`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: GEMINI_MODEL,
     contents: prompt,
   });
   const text = response.text ?? "";
@@ -190,12 +195,13 @@ export async function estimateWithServing(foodName: string): Promise<ServingEsti
 2. 100gあたりの栄養成分
 
 JSON形式のみで返答してください（説明不要）:
-{"servingLabel":"1杯","servingGrams":350,"caloriesPer100g":number,"proteinPer100g":number,"carbsPer100g":number,"fatPer100g":number,"fiberPer100g":number|null,"sugarPer100g":number|null,"sodiumPer100g":number|null}
+{"servingLabel":"1杯","servingGrams":350,"caloriesPer100g":number,"proteinPer100g":number,"carbsPer100g":number,"fatPer100g":number,"fiberPer100g":number|null,"sugarPer100g":number|null,"sodiumPer100g":number|null,"alcoholPer100g":number|null}
 ※ sodiumPer100g は食塩相当量(g)で返してください。
+※ alcoholPer100g は純アルコール量(g)。アルコール飲料でなければ null。
 ※ servingLabel は「1杯」「1個」「1人前」「1枚」など具体的な単位で。`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-preview-04-17",
+    model: GEMINI_MODEL,
     contents: prompt,
   });
 
@@ -214,6 +220,7 @@ JSON形式のみで返答してください（説明不要）:
     fiberPer100g: parsed.fiberPer100g != null ? Math.round(parsed.fiberPer100g * 10) / 10 : undefined,
     sugarPer100g: parsed.sugarPer100g != null ? Math.round(parsed.sugarPer100g * 10) / 10 : undefined,
     sodiumPer100g: parsed.sodiumPer100g != null ? Math.round(parsed.sodiumPer100g * 100) / 100 : undefined,
+    alcoholPer100g: parsed.alcoholPer100g != null ? Math.round(parsed.alcoholPer100g * 10) / 10 : undefined,
   };
 }
 

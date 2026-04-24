@@ -16,6 +16,7 @@ function calcMacros(per100g: NutritionEstimate, amount: number) {
     fiber: per100g.fiberPer100g != null ? Math.round(per100g.fiberPer100g * r * 10) / 10 : undefined,
     sugar: per100g.sugarPer100g != null ? Math.round(per100g.sugarPer100g * r * 10) / 10 : undefined,
     sodium: per100g.sodiumPer100g != null ? Math.round(per100g.sodiumPer100g * r * 100) / 100 : undefined,
+    alcohol: per100g.alcoholPer100g != null ? Math.round(per100g.alcoholPer100g * r * 10) / 10 : undefined,
   };
 }
 
@@ -25,7 +26,7 @@ interface Props {
 
 const MANUAL_EMPTY = {
   calories: 0, protein: 0, carbs: 0, fat: 0,
-  fiber: "", sugar: "", sodium: "",
+  fiber: "", sugar: "", sodium: "", alcohol: "",
 };
 
 export default function MealForm({ onMealAdded }: Props) {
@@ -100,6 +101,7 @@ export default function MealForm({ onMealAdded }: Props) {
         fiber: data.fiber != null ? String(data.fiber) : "",
         sugar: data.sugar != null ? String(data.sugar) : "",
         sodium: data.sodium != null ? String(data.sodium) : "",
+        alcohol: data.alcohol != null ? String(data.alcohol) : "",
       });
       setManualMode(true);
       setPasteMode(false);
@@ -155,6 +157,7 @@ export default function MealForm({ onMealAdded }: Props) {
         fiberPer100g: matched.fiberPer100g,
         sugarPer100g: matched.sugarPer100g,
         sodiumPer100g: matched.sodiumPer100g,
+        alcoholPer100g: matched.alcoholPer100g,
       }
     : estimate ?? null;
 
@@ -171,6 +174,7 @@ export default function MealForm({ onMealAdded }: Props) {
         fiber: manual.fiber !== "" ? Number(manual.fiber) : undefined,
         sugar: manual.sugar !== "" ? Number(manual.sugar) : undefined,
         sodium: manual.sodium !== "" ? Number(manual.sodium) : undefined,
+        alcohol: manual.alcohol !== "" ? Number(manual.alcohol) : undefined,
       }
     : nutrition
       ? calcMacros(nutrition, effectiveAmount)
@@ -413,10 +417,11 @@ export default function MealForm({ onMealAdded }: Props) {
             <ManualField label="炭水化物 (g)" value={manual.carbs} onChange={(v) => setManual((p) => ({ ...p, carbs: Number(v) }))} required />
             <ManualField label="脂質 (g)" value={manual.fat} onChange={(v) => setManual((p) => ({ ...p, fat: Number(v) }))} required />
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <ManualField label="食物繊維 (g)" value={manual.fiber} onChange={(v) => setManual((p) => ({ ...p, fiber: v }))} />
             <ManualField label="糖質 (g)" value={manual.sugar} onChange={(v) => setManual((p) => ({ ...p, sugar: v }))} />
             <ManualField label="食塩相当量 (g)" value={manual.sodium} onChange={(v) => setManual((p) => ({ ...p, sodium: v }))} step={0.01} />
+            <ManualField label="アルコール (g)" value={manual.alcohol} onChange={(v) => setManual((p) => ({ ...p, alcohol: v }))} />
           </div>
         </div>
       )}
@@ -445,8 +450,8 @@ export default function MealForm({ onMealAdded }: Props) {
             <MacroCard label="炭水化物" value={`${macros.carbs} g`} color="text-amber-600" />
             <MacroCard label="脂質" value={`${macros.fat} g`} color="text-red-500" />
           </div>
-          {(macros.fiber != null || macros.sugar != null || macros.sodium != null) && (
-            <div className="grid grid-cols-3 gap-3 pt-2 border-t border-zinc-200">
+          {(macros.fiber != null || macros.sugar != null || macros.sodium != null || macros.alcohol != null) && (
+            <div className="grid grid-cols-4 gap-3 pt-2 border-t border-zinc-200">
               {macros.fiber != null && (
                 <MacroCard label="食物繊維" value={`${macros.fiber} g`} color="text-emerald-600" />
               )}
@@ -455,6 +460,9 @@ export default function MealForm({ onMealAdded }: Props) {
               )}
               {macros.sodium != null && (
                 <MacroCard label="食塩相当量" value={`${macros.sodium} g`} color="text-cyan-600" />
+              )}
+              {macros.alcohol != null && (
+                <MacroCard label="アルコール" value={`${macros.alcohol} g`} color="text-purple-600" />
               )}
             </div>
           )}

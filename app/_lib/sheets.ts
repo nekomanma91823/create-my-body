@@ -44,6 +44,7 @@ const SHEET_CONFIGS: Record<string, string[]> = {
     "FiberPer100g",
     "SugarPer100g",
     "SodiumPer100g",
+    "AlcoholPer100g",
   ],
   Meals: [
     "Date",
@@ -57,6 +58,7 @@ const SHEET_CONFIGS: Record<string, string[]> = {
     "Fiber",
     "Sugar",
     "Sodium",
+    "Alcohol",
     "Source",
   ],
   BodyMetrics: [
@@ -231,6 +233,7 @@ export async function getFoods(): Promise<Food[]> {
     fiberPer100g: r.get("FiberPer100g") ? num(r.get("FiberPer100g")) : undefined,
     sugarPer100g: r.get("SugarPer100g") ? num(r.get("SugarPer100g")) : undefined,
     sodiumPer100g: r.get("SodiumPer100g") ? num(r.get("SodiumPer100g")) : undefined,
+    alcoholPer100g: r.get("AlcoholPer100g") ? num(r.get("AlcoholPer100g")) : undefined,
   }));
 }
 
@@ -246,6 +249,7 @@ export async function updateFood(foodName: string, data: Partial<Omit<Food, "foo
   if (data.fiberPer100g !== undefined) row.set("FiberPer100g", data.fiberPer100g);
   if (data.sugarPer100g !== undefined) row.set("SugarPer100g", data.sugarPer100g);
   if (data.sodiumPer100g !== undefined) row.set("SodiumPer100g", data.sodiumPer100g);
+  if (data.alcoholPer100g !== undefined) row.set("AlcoholPer100g", data.alcoholPer100g);
   await row.save();
   return { foodName, ...data } as Food;
 }
@@ -269,6 +273,7 @@ export async function addFood(data: Food): Promise<Food> {
     FiberPer100g: data.fiberPer100g ?? "",
     SugarPer100g: data.sugarPer100g ?? "",
     SodiumPer100g: data.sodiumPer100g ?? "",
+    AlcoholPer100g: data.alcoholPer100g ?? "",
   });
   return data;
 }
@@ -289,6 +294,7 @@ export async function getMeals(): Promise<Meal[]> {
     fiber: r.get("Fiber") ? num(r.get("Fiber")) : undefined,
     sugar: r.get("Sugar") ? num(r.get("Sugar")) : undefined,
     sodium: r.get("Sodium") ? num(r.get("Sodium")) : undefined,
+    alcohol: r.get("Alcohol") ? num(r.get("Alcohol")) : undefined,
     source: str(r.get("Source")) as Meal["source"],
   }));
 }
@@ -307,6 +313,7 @@ export async function addMeal(data: Meal): Promise<Meal> {
     Fiber: data.fiber ?? "",
     Sugar: data.sugar ?? "",
     Sodium: data.sodium ?? "",
+    Alcohol: data.alcohol ?? "",
     Source: data.source,
   });
   return data;
