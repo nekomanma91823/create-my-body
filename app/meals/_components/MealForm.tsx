@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import type { Food, Meal, NutritionEstimate } from "@/app/_lib/types";
+import type { ParsedNutritionLabel } from "@/app/_lib/gemini";
 
 const MEAL_TYPES: Meal["mealType"][] = ["朝食", "昼食", "夕食", "間食"];
 
@@ -39,6 +40,10 @@ export default function MealForm({ onMealAdded }: Props) {
   const [showSaveToMaster, setShowSaveToMaster] = useState(false);
   const [manualMode, setManualMode] = useState(false);
   const [manual, setManual] = useState(MANUAL_EMPTY);
+  const [pasteMode, setPasteMode] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+  const [parsing, setParsing] = useState(false);
+  const [parsedLabel, setParsedLabel] = useState<ParsedNutritionLabel | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Food[]>([]);
@@ -57,6 +62,9 @@ export default function MealForm({ onMealAdded }: Props) {
       setMatched(null);
       setEstimate(null);
       setManualMode(false);
+      setPasteMode(false);
+      setPasteText("");
+      setParsedLabel(null);
       return;
     }
     const q = foodName.trim().toLowerCase();
@@ -66,6 +74,37 @@ export default function MealForm({ onMealAdded }: Props) {
     setMatched(exact ?? null);
     if (!exact) setEstimate(null);
   }, [foodName, foods]);
+
+  async function handleParseLabel() {
+    setParsing(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/nutrition/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: pasteText }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      const data: ParsedNutritionLabel = await res.json();
+      setParsedLabel(data);
+      // 手動フォームに値をセット
+      setManual({
+        calories: data.calories,
+        protein: data.protein,
+        carbs: data.carbs,
+        fat: data.fat,
+        fiber: data.fiber != null ? String(data.fiber) : "",
+        sugar: data.sugar != null ? String(data.sugar) : "",
+        sodium: data.sodium != null ? String(data.sodium) : "",
+      });
+      setManualMode(true);
+      setPasteMode(false);
+    } catch (e) {
+      setMessage(`解析エラー: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setParsing(false);
+    }
+  }
 
   async function handleEstimate() {
     setEstimating(true);
@@ -155,6 +194,9 @@ export default function MealForm({ onMealAdded }: Props) {
       setEstimate(null);
       setManualMode(false);
       setManual(MANUAL_EMPTY);
+      setPasteMode(false);
+      setPasteText("");
+      setParsedLabel(null);
     } catch (e) {
       setMessage(`エラー: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -232,7 +274,7 @@ export default function MealForm({ onMealAdded }: Props) {
           <p className="text-sm text-amber-800">
             「{foodName.trim()}」はFoodsマスタに未登録です
           </p>
-          {!manualMode && (
+          {!manualMode && !pasteMode && (
             <div className="flex gap-2 flex-wrap">
               <button
                 type="button"
@@ -244,6 +286,13 @@ export default function MealForm({ onMealAdded }: Props) {
               </button>
               <button
                 type="button"
+                onClick={() => setPasteMode(true)}
+                className="rounded-lg bg-white border border-amber-400 px-4 py-2 text-amber-700 text-sm font-medium hover:bg-amber-50"
+              >
+                📋 成分表を貼り付け
+              </button>
+              <button
+                type="button"
                 onClick={() => { setManualMode(true); setEstimate(null); }}
                 className="rounded-lg bg-white border border-amber-400 px-4 py-2 text-amber-700 text-sm font-medium hover:bg-amber-50"
               >
@@ -251,7 +300,37 @@ export default function MealForm({ onMealAdded }: Props) {
               </button>
             </div>
           )}
-          {estimate && showSaveToMaster && !manualMode && (
+          {pasteMode && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-amber-800">成分表のテキストをそのまま貼り付けてください</p>
+                <button
+                  type="button"
+                  onClick={() => { setPasteMode(false); setPasteText(""); }}
+                  className="text-xs text-amber-600 hover:text-amber-800"
+                >
+                  ✕ キャンセル
+                </button>
+              </div>
+              <textarea
+                value={pasteText}
+                onChange={(e) => setPasteText(e.target.value)}
+                placeholder={"例:\nエネルギー 342kcal\nたんぱく質 8.2g\n脂質 12.4g\n炭水化物 49.8g\n  糖質 47.1g\n  食物繊維 2.7g\n食塩相当量 0.8g"}
+                rows={6}
+                className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 font-mono"
+              />
+              <button
+                type="button"
+                onClick={handleParseLabel}
+                disabled={parsing || !pasteText.trim()}
+                className="w-full rounded-lg bg-amber-500 px-4 py-2 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50"
+              >
+                {parsing ? "解析中..." : "✨ AIで解析して入力"}
+              </button>
+            </div>
+          )}
+
+          {estimate && showSaveToMaster && !manualMode && !pasteMode && (
             <div className="flex items-center gap-3">
               <p className="text-xs text-amber-700">
                 {estimate.caloriesPer100g}kcal / P{estimate.proteinPer100g}g / C{estimate.carbsPer100g}g / F{estimate.fatPer100g}g
@@ -275,11 +354,19 @@ export default function MealForm({ onMealAdded }: Props) {
       {manualMode && (
         <div className="rounded-lg bg-zinc-50 border border-zinc-300 p-4 space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-zinc-700">栄養素を直接入力（摂取量の合計）</p>
+            <div>
+              <p className="text-sm font-semibold text-zinc-700">栄養素を直接入力（摂取量の合計）</p>
+              {parsedLabel && (
+                <p className="text-xs text-emerald-600 mt-0.5">
+                  ✓ 成分表から解析済み
+                  {parsedLabel.per === "100g" ? "（100gあたり）" : parsedLabel.servingSize ? `（${parsedLabel.servingSize}あたり）` : "（1食分）"}
+                </p>
+              )}
+            </div>
             <button
               type="button"
-              onClick={() => setManualMode(false)}
-              className="text-xs text-zinc-400 hover:text-zinc-600"
+              onClick={() => { setManualMode(false); setParsedLabel(null); }}
+              className="text-xs text-zinc-400 hover:text-zinc-600 shrink-0"
             >
               ✕ キャンセル
             </button>

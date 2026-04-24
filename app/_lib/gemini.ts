@@ -97,6 +97,55 @@ export async function generateWeeklyReport(
   return JSON.parse(match[0]) as WeeklyReport;
 }
 
+export interface ParsedNutritionLabel {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber?: number;
+  sugar?: number;
+  sodium?: number;
+  per: "100g" | "serving";
+  servingSize?: string;
+}
+
+export async function parseNutritionLabel(text: string): Promise<ParsedNutritionLabel> {
+  const ai = getAI();
+  const prompt = `以下のテキストは食品の栄養成分表示です。数値を抽出してJSONで返してください。
+
+テキスト:
+${text}
+
+注意:
+- per は "100g" または "serving"（1食分・1枚など）のどちらを基準にしているか
+- servingSize は1食分の場合の量（例: "1枚(60g)"）、100g基準なら null
+- sodium は食塩相当量(g)。ナトリウム(mg)が記載されている場合は 食塩相当量 = Na(mg)×2.54÷1000 で変換
+- 記載がない項目は null
+
+JSON形式のみで返答（説明不要）:
+{"calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number|null, "sugar": number|null, "sodium": number|null, "per": "100g"|"serving", "servingSize": string|null}`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash-preview-04-17",
+    contents: prompt,
+  });
+  const text2 = response.text ?? "";
+  const match = text2.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("Geminiから有効なJSONを取得できませんでした");
+  const parsed = JSON.parse(match[0]);
+  return {
+    calories: Math.round(parsed.calories ?? 0),
+    protein: Math.round((parsed.protein ?? 0) * 10) / 10,
+    carbs: Math.round((parsed.carbs ?? 0) * 10) / 10,
+    fat: Math.round((parsed.fat ?? 0) * 10) / 10,
+    fiber: parsed.fiber != null ? Math.round(parsed.fiber * 10) / 10 : undefined,
+    sugar: parsed.sugar != null ? Math.round(parsed.sugar * 10) / 10 : undefined,
+    sodium: parsed.sodium != null ? Math.round(parsed.sodium * 100) / 100 : undefined,
+    per: parsed.per ?? "serving",
+    servingSize: parsed.servingSize ?? undefined,
+  };
+}
+
 export async function generateProgressionSuggestion(
   exercise: string,
   recentSets: WorkoutSet[],

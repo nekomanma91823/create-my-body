@@ -1,42 +1,29 @@
-import { NextRequest, NextResponse } from "next/server";
-import { jwtVerify } from "jose";
+import { auth } from "@/auth";
+import { NextResponse } from "next/server";
 
-const secret = new TextEncoder().encode(
-  process.env.AUTH_SECRET || "your-secret-key-change-this",
-);
+export default auth((req) => {
+  const { pathname } = req.nextUrl;
 
-export async function middleware(request: NextRequest) {
-  const token = request.cookies.get("auth-token")?.value;
-  const pathname = request.nextUrl.pathname;
-
-  // ログインページは常にアクセス可能
-  if (pathname === "/login") {
+  if (
+    pathname === "/login" ||
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/favicon")
+  ) {
     return NextResponse.next();
   }
 
-  // API routes は常にアクセス可能
+  // API routes: pass through (individual routes handle their own data)
   if (pathname.startsWith("/api")) {
     return NextResponse.next();
   }
 
-  // Static assets
-  if (pathname.startsWith("/_next") || pathname.startsWith("/favicon")) {
-    return NextResponse.next();
+  if (!req.auth) {
+    return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  // 認証チェック
-  if (!token) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  // Token 検証
-  try {
-    await jwtVerify(token, secret);
-    return NextResponse.next();
-  } catch {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-}
+  return NextResponse.next();
+});
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
