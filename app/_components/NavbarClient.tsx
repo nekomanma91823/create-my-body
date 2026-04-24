@@ -23,14 +23,14 @@ const QUICK_LINKS = [
 export function DesktopNavLinks() {
   const pathname = usePathname();
   return (
-    <nav className="hidden md:flex items-center gap-0.5">
+    <nav className="hidden md:flex items-center gap-0">
       {NAV_LINKS.map((link) => {
         const isActive = pathname.startsWith(link.href);
         return (
           <Link
             key={link.href}
             href={link.href}
-            className={`px-2.5 py-1.5 rounded-lg text-sm transition-colors ${
+            className={`px-2 py-1 rounded-lg text-xs transition-colors whitespace-nowrap ${
               isActive
                 ? "bg-indigo-50 text-indigo-700 font-medium"
                 : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100"

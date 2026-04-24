@@ -17,6 +17,7 @@ export default function ExerciseManager({ initialExercises }: Props) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [filter, setFilter] = useState("すべて");
+  const [seeding, setSeeding] = useState(false);
 
   const grouped = exercises.reduce<Record<string, Exercise[]>>((acc, ex) => {
     const key = ex.muscleGroup || "その他";
@@ -30,6 +31,24 @@ export default function ExerciseManager({ initialExercises }: Props) {
     filter === "すべて"
       ? exercises
       : exercises.filter((ex) => ex.muscleGroup === filter);
+
+  async function handleSeed() {
+    if (!confirm("デフォルト種目（33種目）を追加しますか？すでに登録済みの種目はスキップされます。")) return;
+    setSeeding(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/exercises/seed", { method: "POST" });
+      if (!res.ok) throw new Error((await res.json()).error);
+      const { added, skipped } = await res.json() as { added: number; skipped: number };
+      const res2 = await fetch("/api/exercises");
+      if (res2.ok) setExercises(await res2.json());
+      setMessage(`${added}件追加しました（${skipped}件はスキップ）`);
+    } catch (err) {
+      setMessage(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSeeding(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -67,15 +86,24 @@ export default function ExerciseManager({ initialExercises }: Props) {
           <h2 className="text-base font-semibold text-zinc-800">
             種目一覧 <span className="text-sm font-normal text-zinc-400">（{exercises.length}件）</span>
           </h2>
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="rounded-lg border border-zinc-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            {musclesWithData.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSeed}
+              disabled={seeding}
+              className="rounded-lg border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50 transition-colors"
+            >
+              {seeding ? "追加中..." : "デフォルト種目を追加"}
+            </button>
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="rounded-lg border border-zinc-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              {musclesWithData.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {filtered.length === 0 ? (

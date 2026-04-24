@@ -11,10 +11,10 @@ export default async function Navbar() {
       <div className="relative max-w-4xl mx-auto px-4">
         <div className="h-14 flex items-center justify-between gap-4">
           {/* 左：ロゴ + デスクトップナビ */}
-          <div className="flex items-center gap-5 min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
             <Link
               href="/"
-              className="text-base font-bold text-zinc-900 shrink-0 hover:text-indigo-600 transition-colors"
+              className="text-sm font-bold text-zinc-900 shrink-0 hover:text-indigo-600 transition-colors"
             >
               Create My Body
             </Link>
