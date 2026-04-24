@@ -7,11 +7,12 @@ import MealForm from "./MealForm";
 interface Props {
   initialMeals: Meal[];
   settings: UserSettings | null;
+  frequentMeals: Meal[];
 }
 
 const MEAL_TYPE_ORDER: Meal["mealType"][] = ["朝食", "昼食", "夕食", "間食"];
 
-export default function MealsClient({ initialMeals, settings }: Props) {
+export default function MealsClient({ initialMeals, settings, frequentMeals }: Props) {
   const [todayMeals, setTodayMeals] = useState<Meal[]>(initialMeals);
 
   const totals = todayMeals.reduce(
@@ -179,7 +180,7 @@ export default function MealsClient({ initialMeals, settings }: Props) {
       {/* 記録フォーム */}
       <section className="bg-white rounded-2xl border border-zinc-200 p-6">
         <h2 className="text-base font-semibold text-zinc-800 mb-6">食事を記録</h2>
-        <MealForm onMealAdded={handleMealAdded} />
+        <MealForm onMealAdded={handleMealAdded} frequentMeals={frequentMeals} />
       </section>
     </div>
   );

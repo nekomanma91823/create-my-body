@@ -1,4 +1,10 @@
-import type { WorkoutSet, ProgressionSuggestion, ExerciseTrend, WeeklyVolume } from "./types";
+import type { WorkoutSet, ProgressionSuggestion, ExerciseTrend, WeeklyVolume, BodyMetric, Meal } from "./types";
+
+export interface TrendPoint {
+  label: string;
+  weight?: number;
+  calories?: number;
+}
 
 export function getISOWeek(dateStr: string): string {
   const d = new Date(dateStr);
@@ -39,6 +45,50 @@ export function calcEst1RM(weight: number, reps: number): number {
 
 export function calcVolume(weight: number, reps: number): number {
   return weight * reps;
+}
+
+export function buildWeightCalorieTrend(
+  metrics: BodyMetric[],
+  meals: Meal[],
+): { daily: TrendPoint[]; weekly: TrendPoint[] } {
+  // 直近30日の日次データ
+  const today = new Date();
+  const dailyPoints: TrendPoint[] = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().slice(0, 10);
+    const label = `${d.getMonth() + 1}/${d.getDate()}`;
+    const metric = metrics.find((m) => m.date === dateStr);
+    const dayMeals = meals.filter((m) => m.date === dateStr);
+    const calories = dayMeals.length > 0
+      ? Math.round(dayMeals.reduce((s, m) => s + m.calories, 0))
+      : undefined;
+    dailyPoints.push({ label, weight: metric?.weight, calories });
+  }
+
+  // 直近12週の週次データ
+  const weekMap = new Map<string, { weights: number[]; calories: number[] }>();
+  for (const m of metrics) {
+    const w = getISOWeek(m.date);
+    if (!weekMap.has(w)) weekMap.set(w, { weights: [], calories: [] });
+    weekMap.get(w)!.weights.push(m.weight);
+  }
+  for (const m of meals) {
+    const w = getISOWeek(m.date);
+    if (!weekMap.has(w)) weekMap.set(w, { weights: [], calories: [] });
+    weekMap.get(w)!.calories.push(m.calories);
+  }
+  const weeklyPoints: TrendPoint[] = Array.from(weekMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-12)
+    .map(([week, { weights, calories }]) => ({
+      label: week.replace(/^\d{4}-/, ""),
+      weight: weights.length > 0 ? Math.round((weights.reduce((s, v) => s + v, 0) / weights.length) * 10) / 10 : undefined,
+      calories: calories.length > 0 ? Math.round(calories.reduce((s, v) => s + v, 0) / calories.length) : undefined,
+    }));
+
+  return { daily: dailyPoints, weekly: weeklyPoints };
 }
 
 export function getProgressionSuggestion(

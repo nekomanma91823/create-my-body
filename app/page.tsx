@@ -1,17 +1,19 @@
-import { getWorkouts, getMeals, getUserSettings } from "@/app/_lib/sheets";
-import { getISOWeek, buildWeeklyVolume, buildExerciseTrend } from "@/app/_lib/calculations";
+import { getWorkouts, getMeals, getUserSettings, getBodyMetrics } from "@/app/_lib/sheets";
+import { getISOWeek, buildWeeklyVolume, buildExerciseTrend, buildWeightCalorieTrend } from "@/app/_lib/calculations";
 import Dashboard from "@/app/_components/Dashboard";
 
 export default async function Home() {
   try {
     const todayStr = new Date().toISOString().slice(0, 10);
-    const [workouts, allMeals, settings] = await Promise.all([
+    const [workouts, allMeals, settings, bodyMetrics] = await Promise.all([
       getWorkouts(),
       getMeals(),
       getUserSettings(),
+      getBodyMetrics(),
     ]);
 
     const todayMeals = allMeals.filter((m) => m.date === todayStr);
+    const thisWeek = getISOWeek(todayStr);
 
     const exercises = Array.from(new Set(workouts.map((w) => w.exercise)));
     const { data: volumeData, groups: muscleGroups } = buildWeeklyVolume(workouts);
@@ -19,8 +21,11 @@ export default async function Home() {
       .sort((a, b) => b.date.localeCompare(a.date))
       .slice(0, 5);
     const totalVolumeThisWeek = workouts
-      .filter((w) => getISOWeek(w.date) === getISOWeek(todayStr))
+      .filter((w) => getISOWeek(w.date) === thisWeek)
       .reduce((sum, w) => sum + w.volume, 0);
+    const thisWeekSessions = new Set(
+      workouts.filter((w) => getISOWeek(w.date) === thisWeek).map((w) => w.date)
+    ).size;
     const trendsByExercise = Object.fromEntries(
       exercises.map((ex) => [ex, buildExerciseTrend(workouts, ex)])
     );
@@ -33,6 +38,9 @@ export default async function Home() {
       }),
       { calories: 0, protein: 0, carbs: 0, fat: 0 },
     );
+    const latestWeight = [...bodyMetrics]
+      .sort((a, b) => b.date.localeCompare(a.date))[0]?.weight ?? null;
+    const trendData = buildWeightCalorieTrend(bodyMetrics, allMeals);
 
     return (
       <Dashboard
@@ -41,9 +49,12 @@ export default async function Home() {
         muscleGroups={muscleGroups}
         recentSets={recentSets}
         totalVolumeThisWeek={totalVolumeThisWeek}
+        thisWeekSessions={thisWeekSessions}
         todayTotals={todayTotals}
         settings={settings}
         trendsByExercise={trendsByExercise}
+        latestWeight={latestWeight}
+        trendData={trendData}
       />
     );
   } catch (e) {

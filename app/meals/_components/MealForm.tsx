@@ -22,6 +22,7 @@ function calcMacros(per100g: NutritionEstimate, amount: number) {
 
 interface Props {
   onMealAdded?: (meal: Meal) => void;
+  frequentMeals?: Meal[];
 }
 
 const MANUAL_EMPTY = {
@@ -29,7 +30,7 @@ const MANUAL_EMPTY = {
   fiber: "", sugar: "", sodium: "", alcohol: "",
 };
 
-export default function MealForm({ onMealAdded }: Props) {
+export default function MealForm({ onMealAdded, frequentMeals = [] }: Props) {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [mealType, setMealType] = useState<Meal["mealType"]>("朝食");
   const [foodName, setFoodName] = useState("");
@@ -47,6 +48,7 @@ export default function MealForm({ onMealAdded }: Props) {
   const [pasteText, setPasteText] = useState("");
   const [parsing, setParsing] = useState(false);
   const [parsedLabel, setParsedLabel] = useState<ParsedNutritionLabel | null>(null);
+  const [quickMeal, setQuickMeal] = useState<Meal | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Food[]>([]);
@@ -60,6 +62,7 @@ export default function MealForm({ onMealAdded }: Props) {
   }, []);
 
   useEffect(() => {
+    setQuickMeal(null);
     if (!foodName.trim()) {
       setSuggestions([]);
       setMatched(null);
@@ -147,7 +150,7 @@ export default function MealForm({ onMealAdded }: Props) {
     setMessage("Foodsマスタに追加しました");
   }
 
-  const source = matched ? "master" : manualMode ? "manual" : estimate ? "gemini" : null;
+  const source = quickMeal ? quickMeal.source : matched ? "master" : manualMode ? "manual" : estimate ? "gemini" : null;
   const nutrition = matched
     ? {
         caloriesPer100g: matched.caloriesPer100g,
@@ -165,20 +168,31 @@ export default function MealForm({ onMealAdded }: Props) {
     ? Math.round(servingEstimate.servingGrams * servings)
     : amount;
 
-  const macros = manualMode
+  const macros = quickMeal
     ? {
-        calories: manual.calories,
-        protein: manual.protein,
-        carbs: manual.carbs,
-        fat: manual.fat,
-        fiber: manual.fiber !== "" ? Number(manual.fiber) : undefined,
-        sugar: manual.sugar !== "" ? Number(manual.sugar) : undefined,
-        sodium: manual.sodium !== "" ? Number(manual.sodium) : undefined,
-        alcohol: manual.alcohol !== "" ? Number(manual.alcohol) : undefined,
+        calories: quickMeal.calories,
+        protein: quickMeal.protein,
+        carbs: quickMeal.carbs,
+        fat: quickMeal.fat,
+        fiber: quickMeal.fiber,
+        sugar: quickMeal.sugar,
+        sodium: quickMeal.sodium,
+        alcohol: quickMeal.alcohol,
       }
-    : nutrition
-      ? calcMacros(nutrition, effectiveAmount)
-      : null;
+    : manualMode
+      ? {
+          calories: manual.calories,
+          protein: manual.protein,
+          carbs: manual.carbs,
+          fat: manual.fat,
+          fiber: manual.fiber !== "" ? Number(manual.fiber) : undefined,
+          sugar: manual.sugar !== "" ? Number(manual.sugar) : undefined,
+          sodium: manual.sodium !== "" ? Number(manual.sodium) : undefined,
+          alcohol: manual.alcohol !== "" ? Number(manual.alcohol) : undefined,
+        }
+      : nutrition
+        ? calcMacros(nutrition, effectiveAmount)
+        : null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -193,7 +207,7 @@ export default function MealForm({ onMealAdded }: Props) {
           date,
           mealType,
           foodName: foodName.trim(),
-          amount: manualMode ? 1 : effectiveAmount,
+          amount: quickMeal ? quickMeal.amount : manualMode ? 1 : effectiveAmount,
           ...macros,
           source,
         }),
@@ -213,6 +227,7 @@ export default function MealForm({ onMealAdded }: Props) {
       setPasteMode(false);
       setPasteText("");
       setParsedLabel(null);
+      setQuickMeal(null);
     } catch (e) {
       setMessage(`エラー: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -220,8 +235,53 @@ export default function MealForm({ onMealAdded }: Props) {
     }
   }
 
+  function handleQuickSelect(meal: Meal) {
+    if (quickMeal?.foodName === meal.foodName) {
+      setQuickMeal(null);
+      setFoodName("");
+      return;
+    }
+    setQuickMeal(meal);
+    setFoodName(meal.foodName);
+    setAmount(meal.amount);
+    setManualMode(false);
+    setEstimate(null);
+    setServingEstimate(null);
+    setPasteMode(false);
+    setParsedLabel(null);
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* クイック記録 */}
+      {frequentMeals.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-zinc-500 mb-2">よく食べる食事</p>
+          <div className="flex gap-2 flex-wrap">
+            {frequentMeals.map((meal) => {
+              const isSelected = quickMeal?.foodName === meal.foodName;
+              return (
+                <button
+                  key={meal.foodName}
+                  type="button"
+                  onClick={() => handleQuickSelect(meal)}
+                  className={`rounded-xl px-3 py-2 text-left transition-colors border ${
+                    isSelected
+                      ? "bg-indigo-600 border-indigo-600 text-white"
+                      : "bg-white border-zinc-200 text-zinc-700 hover:border-indigo-300 hover:bg-indigo-50"
+                  }`}
+                >
+                  <p className="text-xs font-medium leading-tight">{meal.foodName}</p>
+                  <p className={`text-xs mt-0.5 ${isSelected ? "text-indigo-200" : "text-zinc-400"}`}>
+                    {Math.round(meal.calories)} kcal
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Date & MealType */}
       <div className="grid grid-cols-2 gap-4">
         <div>

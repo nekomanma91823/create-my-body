@@ -16,6 +16,7 @@ export default function TemplateManager() {
   const [targetReps, setTargetReps] = useState(8);
   const [targetRPE, setTargetRPE] = useState(8);
   const [saving, setSaving] = useState(false);
+  const [seeding, setSeeding] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -43,6 +44,24 @@ export default function TemplateManager() {
   );
 
   const resolvedTemplateName = templateName === "__new__" ? newTemplateName : templateName;
+
+  async function handleSeed() {
+    if (!confirm("デフォルトテンプレート（PPL・Upper/Lower）を追加しますか？")) return;
+    setSeeding(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/workout-templates/seed", { method: "POST" });
+      if (!res.ok) throw new Error((await res.json()).error);
+      const { added, skipped } = await res.json() as { added: number; skipped: number };
+      const res2 = await fetch("/api/workout-templates");
+      if (res2.ok) setTemplates(await res2.json());
+      setMessage(`${added}件追加しました（${skipped}件はスキップ）`);
+    } catch (err) {
+      setMessage(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSeeding(false);
+    }
+  }
 
   async function handleAddExercise(e: React.FormEvent) {
     e.preventDefault();
@@ -94,7 +113,16 @@ export default function TemplateManager() {
       {/* 既存テンプレート一覧 */}
       {templateNames.length > 0 && (
         <section className="bg-white rounded-2xl border border-zinc-200 p-6 space-y-4">
-          <h2 className="text-base font-semibold text-zinc-800">テンプレート一覧</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-zinc-800">テンプレート一覧</h2>
+            <button
+              onClick={handleSeed}
+              disabled={seeding}
+              className="rounded-lg border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50 transition-colors"
+            >
+              {seeding ? "追加中..." : "デフォルトを追加"}
+            </button>
+          </div>
           {templateNames.map((name) => (
             <div key={name}>
               <h3 className="text-sm font-semibold text-zinc-700 mb-2">{name}</h3>
@@ -125,9 +153,18 @@ export default function TemplateManager() {
 
       {/* 種目追加フォーム */}
       <section className="bg-white rounded-2xl border border-zinc-200 p-6">
-        <h2 className="text-base font-semibold text-zinc-800 mb-4">
-          種目を追加
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-zinc-800">種目を追加</h2>
+          {templateNames.length === 0 && (
+            <button
+              onClick={handleSeed}
+              disabled={seeding}
+              className="rounded-lg border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50 transition-colors"
+            >
+              {seeding ? "追加中..." : "デフォルトを追加"}
+            </button>
+          )}
+        </div>
         <form onSubmit={handleAddExercise} className="space-y-4">
           {/* テンプレート名 */}
           <div>
