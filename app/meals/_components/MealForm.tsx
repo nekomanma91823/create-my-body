@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import type { Food, Meal, NutritionEstimate } from "@/app/_lib/types";
-import type { ParsedNutritionLabel } from "@/app/_lib/gemini";
+import type { ParsedNutritionLabel, ServingEstimate } from "@/app/_lib/gemini";
 
 const MEAL_TYPES: Meal["mealType"][] = ["朝食", "昼食", "夕食", "間食"];
 
@@ -36,6 +36,8 @@ export default function MealForm({ onMealAdded }: Props) {
   const [foods, setFoods] = useState<Food[]>([]);
   const [matched, setMatched] = useState<Food | null>(null);
   const [estimate, setEstimate] = useState<NutritionEstimate | null>(null);
+  const [servingEstimate, setServingEstimate] = useState<ServingEstimate | null>(null);
+  const [servings, setServings] = useState(1);
   const [estimating, setEstimating] = useState(false);
   const [showSaveToMaster, setShowSaveToMaster] = useState(false);
   const [manualMode, setManualMode] = useState(false);
@@ -61,6 +63,8 @@ export default function MealForm({ onMealAdded }: Props) {
       setSuggestions([]);
       setMatched(null);
       setEstimate(null);
+      setServingEstimate(null);
+      setServings(1);
       setManualMode(false);
       setPasteMode(false);
       setPasteText("");
@@ -116,8 +120,10 @@ export default function MealForm({ onMealAdded }: Props) {
         body: JSON.stringify({ foodName: foodName.trim() }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
-      const data: NutritionEstimate = await res.json();
+      const data: ServingEstimate = await res.json();
+      setServingEstimate(data);
       setEstimate(data);
+      setServings(1);
       setShowSaveToMaster(true);
     } catch (e) {
       setMessage(`推定エラー: ${e instanceof Error ? e.message : String(e)}`);
@@ -140,18 +146,22 @@ export default function MealForm({ onMealAdded }: Props) {
   }
 
   const source = matched ? "master" : manualMode ? "manual" : estimate ? "gemini" : null;
-  const nutrition =
-    matched
-      ? {
-          caloriesPer100g: matched.caloriesPer100g,
-          proteinPer100g: matched.proteinPer100g,
-          carbsPer100g: matched.carbsPer100g,
-          fatPer100g: matched.fatPer100g,
-          fiberPer100g: matched.fiberPer100g,
-          sugarPer100g: matched.sugarPer100g,
-          sodiumPer100g: matched.sodiumPer100g,
-        }
-      : estimate ?? null;
+  const nutrition = matched
+    ? {
+        caloriesPer100g: matched.caloriesPer100g,
+        proteinPer100g: matched.proteinPer100g,
+        carbsPer100g: matched.carbsPer100g,
+        fatPer100g: matched.fatPer100g,
+        fiberPer100g: matched.fiberPer100g,
+        sugarPer100g: matched.sugarPer100g,
+        sodiumPer100g: matched.sodiumPer100g,
+      }
+    : estimate ?? null;
+
+  const effectiveAmount = servingEstimate && !matched
+    ? Math.round(servingEstimate.servingGrams * servings)
+    : amount;
+
   const macros = manualMode
     ? {
         calories: manual.calories,
@@ -163,7 +173,7 @@ export default function MealForm({ onMealAdded }: Props) {
         sodium: manual.sodium !== "" ? Number(manual.sodium) : undefined,
       }
     : nutrition
-      ? calcMacros(nutrition, amount)
+      ? calcMacros(nutrition, effectiveAmount)
       : null;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -179,7 +189,7 @@ export default function MealForm({ onMealAdded }: Props) {
           date,
           mealType,
           foodName: foodName.trim(),
-          amount,
+          amount: manualMode ? 1 : effectiveAmount,
           ...macros,
           source,
         }),
@@ -192,6 +202,8 @@ export default function MealForm({ onMealAdded }: Props) {
       setAmount(100);
       setMatched(null);
       setEstimate(null);
+      setServingEstimate(null);
+      setServings(1);
       setManualMode(false);
       setManual(MANUAL_EMPTY);
       setPasteMode(false);
@@ -269,7 +281,7 @@ export default function MealForm({ onMealAdded }: Props) {
       </div>
 
       {/* Gemini estimate / manual input */}
-      {foodName.trim() && !matched && (
+      {foodName.trim() && !matched && !manualMode && (
         <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 space-y-3">
           <p className="text-sm text-amber-800">
             「{foodName.trim()}」はFoodsマスタに未登録です
@@ -330,20 +342,44 @@ export default function MealForm({ onMealAdded }: Props) {
             </div>
           )}
 
-          {estimate && showSaveToMaster && !manualMode && !pasteMode && (
-            <div className="flex items-center gap-3">
-              <p className="text-xs text-amber-700">
-                {estimate.caloriesPer100g}kcal / P{estimate.proteinPer100g}g / C{estimate.carbsPer100g}g / F{estimate.fatPer100g}g
-                {estimate.fiberPer100g != null && ` / 食物繊維${estimate.fiberPer100g}g`}
-                {estimate.sodiumPer100g != null && ` / 食塩${estimate.sodiumPer100g}g`}
-                （per 100g）
-              </p>
+          {servingEstimate && showSaveToMaster && !manualMode && !pasteMode && (
+            <div className="space-y-3">
+              <div className="rounded-lg bg-white border border-amber-200 p-3">
+                <p className="text-xs text-amber-700 font-medium mb-1">
+                  AI推定: {servingEstimate.servingLabel}（約{servingEstimate.servingGrams}g）
+                </p>
+                <p className="text-xs text-amber-600">
+                  {Math.round(servingEstimate.caloriesPer100g * servingEstimate.servingGrams / 100)}kcal /
+                  P{Math.round(servingEstimate.proteinPer100g * servingEstimate.servingGrams / 100 * 10) / 10}g /
+                  C{Math.round(servingEstimate.carbsPer100g * servingEstimate.servingGrams / 100 * 10) / 10}g /
+                  F{Math.round(servingEstimate.fatPer100g * servingEstimate.servingGrams / 100 * 10) / 10}g
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-amber-800 font-medium mb-1.5">何{servingEstimate.servingLabel.replace(/^[0-9]+/, "")}食べましたか？</p>
+                <div className="flex gap-1.5 flex-wrap">
+                  {[0.5, 1, 1.5, 2, 2.5, 3].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setServings(n)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                        servings === n
+                          ? "bg-amber-500 text-white"
+                          : "bg-white border border-amber-300 text-amber-700 hover:bg-amber-50"
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={handleSaveToMaster}
-                className="shrink-0 rounded-lg bg-white border border-amber-400 px-3 py-1 text-amber-700 text-xs font-medium hover:bg-amber-50"
+                className="text-xs text-amber-600 hover:text-amber-800 underline"
               >
-                マスタに保存
+                Foodsマスタに保存する
               </button>
             </div>
           )}
@@ -385,8 +421,8 @@ export default function MealForm({ onMealAdded }: Props) {
         </div>
       )}
 
-      {/* Amount (hidden in manual mode) */}
-      {!manualMode && (
+      {/* Amount (hidden in manual mode and serving estimate mode) */}
+      {!manualMode && !servingEstimate && (
         <div>
           <label className="block text-sm font-medium text-zinc-700 mb-1">量 (g)</label>
           <input

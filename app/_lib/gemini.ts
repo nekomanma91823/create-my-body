@@ -177,17 +177,25 @@ ${history}
   return JSON.parse(match[0]) as AiProgressionSuggestion;
 }
 
-export async function estimateNutrition(
-  foodName: string,
-): Promise<NutritionEstimate> {
+export interface ServingEstimate extends NutritionEstimate {
+  servingLabel: string;
+  servingGrams: number;
+}
+
+export async function estimateWithServing(foodName: string): Promise<ServingEstimate> {
   const ai = getAI();
-  const prompt = `「${foodName}」の栄養成分を100gあたりで推定してください。
+  const prompt = `「${foodName}」について以下を推定してください。
+
+1. 一般的な1食分の目安量（例: 1杯、1個、1人前、1枚）とそのグラム数
+2. 100gあたりの栄養成分
+
 JSON形式のみで返答してください（説明不要）:
-{"caloriesPer100g": number, "proteinPer100g": number, "carbsPer100g": number, "fatPer100g": number, "fiberPer100g": number, "sugarPer100g": number, "sodiumPer100g": number}
-※ sodiumPer100g は食塩相当量(g)で返してください。`;
+{"servingLabel":"1杯","servingGrams":350,"caloriesPer100g":number,"proteinPer100g":number,"carbsPer100g":number,"fatPer100g":number,"fiberPer100g":number|null,"sugarPer100g":number|null,"sodiumPer100g":number|null}
+※ sodiumPer100g は食塩相当量(g)で返してください。
+※ servingLabel は「1杯」「1個」「1人前」「1枚」など具体的な単位で。`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-2.5-flash-preview-04-17",
     contents: prompt,
   });
 
@@ -195,23 +203,20 @@ JSON形式のみで返答してください（説明不要）:
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("Geminiから有効なJSONを取得できませんでした");
 
-  const parsed = JSON.parse(match[0]) as NutritionEstimate;
+  const parsed = JSON.parse(match[0]);
   return {
+    servingLabel: parsed.servingLabel ?? "1食分",
+    servingGrams: Math.round(parsed.servingGrams ?? 100),
     caloriesPer100g: Math.round(parsed.caloriesPer100g),
     proteinPer100g: Math.round(parsed.proteinPer100g * 10) / 10,
     carbsPer100g: Math.round(parsed.carbsPer100g * 10) / 10,
     fatPer100g: Math.round(parsed.fatPer100g * 10) / 10,
-    fiberPer100g:
-      parsed.fiberPer100g != null
-        ? Math.round(parsed.fiberPer100g * 10) / 10
-        : undefined,
-    sugarPer100g:
-      parsed.sugarPer100g != null
-        ? Math.round(parsed.sugarPer100g * 10) / 10
-        : undefined,
-    sodiumPer100g:
-      parsed.sodiumPer100g != null
-        ? Math.round(parsed.sodiumPer100g * 100) / 100
-        : undefined,
+    fiberPer100g: parsed.fiberPer100g != null ? Math.round(parsed.fiberPer100g * 10) / 10 : undefined,
+    sugarPer100g: parsed.sugarPer100g != null ? Math.round(parsed.sugarPer100g * 10) / 10 : undefined,
+    sodiumPer100g: parsed.sodiumPer100g != null ? Math.round(parsed.sodiumPer100g * 100) / 100 : undefined,
   };
+}
+
+export async function estimateNutrition(foodName: string): Promise<NutritionEstimate> {
+  return estimateWithServing(foodName);
 }
