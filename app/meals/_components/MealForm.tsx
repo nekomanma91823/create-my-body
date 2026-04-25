@@ -151,8 +151,15 @@ export default function MealForm({ onMealAdded, frequentMeals = [] }: Props) {
       });
       if (!res.ok) throw new Error((await res.json()).error);
       const newFood: Food = { foodName: foodName.trim(), ...estimate };
+      // matched が設定された後も正しいグラム数で記録できるよう、
+      // servingEstimate をクリアして amount に反映する
+      const savedGrams = servingEstimate
+        ? Math.round(servingEstimate.servingGrams * servings)
+        : amount;
       setFoods((prev) => [...prev, newFood]);
       setShowSaveToMaster(false);
+      setServingEstimate(null);
+      setAmount(savedGrams);
       setMessage("Foodsマスタに追加しました");
     } catch (e) {
       setMessage(`保存エラー: ${e instanceof Error ? e.message : String(e)}`);
