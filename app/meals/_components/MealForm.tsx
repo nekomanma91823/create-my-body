@@ -49,10 +49,14 @@ export default function MealForm({ onMealAdded, frequentMeals = [] }: Props) {
   const [parsing, setParsing] = useState(false);
   const [parsedLabel, setParsedLabel] = useState<ParsedNutritionLabel | null>(null);
   const [quickMeal, setQuickMeal] = useState<Meal | null>(null);
+  const [savingToMaster, setSavingToMaster] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Food[]>([]);
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [loadingAiSuggestions, setLoadingAiSuggestions] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const aiSuggestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetch("/api/foods")
@@ -63,8 +67,11 @@ export default function MealForm({ onMealAdded, frequentMeals = [] }: Props) {
 
   useEffect(() => {
     setQuickMeal(null);
+    if (aiSuggestTimerRef.current) clearTimeout(aiSuggestTimerRef.current);
+
     if (!foodName.trim()) {
       setSuggestions([]);
+      setAiSuggestions([]);
       setMatched(null);
       setEstimate(null);
       setServingEstimate(null);
@@ -81,6 +88,29 @@ export default function MealForm({ onMealAdded, frequentMeals = [] }: Props) {
     const exact = foods.find((f) => f.foodName === foodName.trim());
     setMatched(exact ?? null);
     if (!exact) setEstimate(null);
+
+    // マスタに完全一致がなく2文字以上のときAI候補を取得（600msデバウンス）
+    if (!exact && foodName.trim().length >= 2) {
+      setLoadingAiSuggestions(true);
+      aiSuggestTimerRef.current = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/nutrition/suggest?q=${encodeURIComponent(foodName.trim())}`);
+          if (res.ok) {
+            const data: { suggestions: string[] } = await res.json();
+            // マスタ候補と重複するものは除外
+            const masterNames = new Set(hits.map((f) => f.foodName));
+            setAiSuggestions(data.suggestions.filter((s) => !masterNames.has(s)));
+          }
+        } catch {
+          // サジェスト失敗は無視
+        } finally {
+          setLoadingAiSuggestions(false);
+        }
+      }, 600);
+    } else {
+      setAiSuggestions([]);
+      setLoadingAiSuggestions(false);
+    }
   }, [foodName, foods]);
 
   async function handleParseLabel() {
@@ -139,15 +169,24 @@ export default function MealForm({ onMealAdded, frequentMeals = [] }: Props) {
 
   async function handleSaveToMaster() {
     if (!estimate) return;
-    await fetch("/api/foods", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ foodName: foodName.trim(), ...estimate }),
-    });
-    setFoods((prev) => [...prev, { foodName: foodName.trim(), ...estimate }]);
-    setMatched({ foodName: foodName.trim(), ...estimate });
-    setShowSaveToMaster(false);
-    setMessage("Foodsマスタに追加しました");
+    setSavingToMaster(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/foods", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ foodName: foodName.trim(), ...estimate }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      const newFood: Food = { foodName: foodName.trim(), ...estimate };
+      setFoods((prev) => [...prev, newFood]);
+      setShowSaveToMaster(false);
+      setMessage("Foodsマスタに追加しました");
+    } catch (e) {
+      setMessage(`保存エラー: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSavingToMaster(false);
+    }
   }
 
   const source = quickMeal ? quickMeal.source : matched ? "master" : manualMode ? "manual" : estimate ? "gemini" : null;
@@ -326,20 +365,37 @@ export default function MealForm({ onMealAdded, frequentMeals = [] }: Props) {
           className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           autoComplete="off"
         />
-        {suggestions.length > 0 && !matched && (
-          <ul className="absolute z-10 mt-1 w-full bg-white border border-zinc-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+        {(suggestions.length > 0 || aiSuggestions.length > 0 || loadingAiSuggestions) && !matched && (
+          <ul className="absolute z-10 mt-1 w-full bg-white border border-zinc-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
             {suggestions.map((f) => (
               <li
                 key={f.foodName}
-                onClick={() => { setFoodName(f.foodName); setSuggestions([]); }}
-                className="px-3 py-2 text-sm cursor-pointer hover:bg-indigo-50"
+                onClick={() => { setFoodName(f.foodName); setSuggestions([]); setAiSuggestions([]); }}
+                className="px-3 py-2 text-sm cursor-pointer hover:bg-indigo-50 flex items-center justify-between"
               >
-                {f.foodName}
-                <span className="ml-2 text-xs text-zinc-400">
-                  {f.caloriesPer100g}kcal/100g
-                </span>
+                <span>{f.foodName}</span>
+                <span className="text-xs text-zinc-400">{f.caloriesPer100g}kcal/100g</span>
               </li>
             ))}
+            {(aiSuggestions.length > 0 || loadingAiSuggestions) && (
+              <>
+                {suggestions.length > 0 && <li className="border-t border-zinc-100" />}
+                {loadingAiSuggestions && aiSuggestions.length === 0 ? (
+                  <li className="px-3 py-2 text-xs text-zinc-400">AI候補を取得中...</li>
+                ) : (
+                  aiSuggestions.map((name) => (
+                    <li
+                      key={name}
+                      onClick={() => { setFoodName(name); setSuggestions([]); setAiSuggestions([]); }}
+                      className="px-3 py-2 text-sm cursor-pointer hover:bg-amber-50 flex items-center justify-between"
+                    >
+                      <span>{name}</span>
+                      <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">AI候補</span>
+                    </li>
+                  ))
+                )}
+              </>
+            )}
           </ul>
         )}
       </div>
@@ -350,7 +406,7 @@ export default function MealForm({ onMealAdded, frequentMeals = [] }: Props) {
           <p className="text-sm text-amber-800">
             「{foodName.trim()}」はFoodsマスタに未登録です
           </p>
-          {!manualMode && !pasteMode && (
+          {!manualMode && !pasteMode && !servingEstimate && (
             <div className="flex gap-2 flex-wrap">
               <button
                 type="button"
@@ -375,6 +431,9 @@ export default function MealForm({ onMealAdded, frequentMeals = [] }: Props) {
                 ✏️ 手動で入力
               </button>
             </div>
+          )}
+          {estimating && (
+            <p className="text-sm text-amber-700">Geminiで推定中...</p>
           )}
           {pasteMode && (
             <div className="space-y-2">
@@ -438,13 +497,23 @@ export default function MealForm({ onMealAdded, frequentMeals = [] }: Props) {
                   ))}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={handleSaveToMaster}
-                className="text-xs text-amber-600 hover:text-amber-800 underline"
-              >
-                Foodsマスタに保存する
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleSaveToMaster}
+                  disabled={savingToMaster}
+                  className="rounded-lg bg-white border border-amber-400 px-4 py-2 text-amber-700 text-sm font-medium hover:bg-amber-50 disabled:opacity-50 transition-colors"
+                >
+                  {savingToMaster ? "保存中..." : "📥 Foodsマスタに保存する"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setServingEstimate(null); setEstimate(null); setShowSaveToMaster(false); }}
+                  className="text-xs text-amber-500 hover:text-amber-700"
+                >
+                  再推定
+                </button>
+              </div>
             </div>
           )}
         </div>

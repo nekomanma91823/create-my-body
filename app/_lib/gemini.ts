@@ -227,3 +227,24 @@ JSON形式のみで返答してください（説明不要）:
 export async function estimateNutrition(foodName: string): Promise<NutritionEstimate> {
   return estimateWithServing(foodName);
 }
+
+export async function suggestFoods(query: string): Promise<string[]> {
+  const ai = getAI();
+  const prompt = `ユーザーが「${query}」と入力しています。これに関連する日本の食品・料理名を5件提案してください。
+具体的な品名で（例：「ラーメン」ではなく「醤油ラーメン」「豚骨ラーメン」）。
+すでに入力された文字列と重複するものは避けてください。
+
+JSON配列のみで返答（説明不要）:
+["候補1", "候補2", "候補3", "候補4", "候補5"]`;
+
+  const response = await ai.models.generateContent({ model: GEMINI_MODEL, contents: prompt });
+  const text = response.text ?? "";
+  const match = text.match(/\[[\s\S]*\]/);
+  if (!match) return [];
+  try {
+    const parsed = JSON.parse(match[0]);
+    return Array.isArray(parsed) ? parsed.filter((s): s is string => typeof s === "string") : [];
+  } catch {
+    return [];
+  }
+}
