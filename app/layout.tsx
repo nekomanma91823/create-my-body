@@ -18,6 +18,10 @@ export const metadata: Metadata = {
   title: "Create My Body",
   description: "筋トレ記録・進捗管理アプリ",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/icon.png",
+    apple: "/apple-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
