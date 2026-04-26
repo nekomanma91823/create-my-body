@@ -120,6 +120,13 @@ async function getSheet(title: string) {
     _sheetsLoaded.add(title);
   } else if (!_sheetsLoaded.has(title)) {
     await sheet.loadHeaderRow();
+    // SHEET_CONFIGSに定義された列が不足していれば末尾に追加する
+    const expected = SHEET_CONFIGS[title] ?? [];
+    const existing = new Set(sheet.headerValues);
+    const missing = expected.filter((col) => !existing.has(col));
+    if (missing.length > 0) {
+      await sheet.setHeaderRow([...sheet.headerValues, ...missing]);
+    }
     _sheetsLoaded.add(title);
   }
   return sheet;
