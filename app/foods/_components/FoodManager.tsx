@@ -16,6 +16,8 @@ const EMPTY_FORM: Omit<Food, "foodName"> = {
   sugarPer100g: undefined,
   sodiumPer100g: undefined,
   alcoholPer100g: undefined,
+  servingGrams: undefined,
+  servingLabel: undefined,
 };
 
 export default function FoodManager({ initialFoods }: Props) {
@@ -45,6 +47,8 @@ export default function FoodManager({ initialFoods }: Props) {
       sugarPer100g: food.sugarPer100g,
       sodiumPer100g: food.sodiumPer100g,
       alcoholPer100g: food.alcoholPer100g,
+      servingGrams: food.servingGrams,
+      servingLabel: food.servingLabel,
     });
     setAddMode(false);
     setMessage(null);
@@ -180,6 +184,25 @@ export default function FoodManager({ initialFoods }: Props) {
             <NumInput label="アルコール (g)" value={form.alcoholPer100g} onChange={(v) => numField("alcoholPer100g", v)} optional />
           </div>
 
+          <div className="border-t border-zinc-200 pt-3">
+            <p className="text-xs text-zinc-400 mb-2">1食分の目安（設定すると記録時にg換算で選択できます）</p>
+            <div className="grid grid-cols-2 gap-3">
+              <NumInput label="1食分 (g)" value={form.servingGrams} onChange={(v) => numField("servingGrams", v)} optional />
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 mb-1">
+                  単位ラベル<span className="ml-1 text-zinc-400">（任意）</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.servingLabel ?? ""}
+                  onChange={(e) => setForm((p) => ({ ...p, servingLabel: e.target.value || undefined }))}
+                  placeholder="例: 1本、1個、1杯"
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="flex gap-2 pt-2">
             <button
               onClick={handleSave}
@@ -236,6 +259,11 @@ export default function FoodManager({ initialFoods }: Props) {
                     {food.sugarPer100g != null && ` / 糖質${food.sugarPer100g}g`}
                     {food.sodiumPer100g != null && ` / 食塩${food.sodiumPer100g}g`}
                     {food.alcoholPer100g != null && ` / アルコール${food.alcoholPer100g}g`}
+                    {food.servingGrams != null && (
+                      <span className="ml-1 text-indigo-400">
+                        {` / ${food.servingLabel ?? "1食分"}=${food.servingGrams}g`}
+                      </span>
+                    )}
                   </p>
                 </div>
                 <div className="flex gap-1.5 shrink-0">

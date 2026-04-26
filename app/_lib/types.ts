@@ -38,6 +38,8 @@ export interface Food {
   sugarPer100g?: number;
   sodiumPer100g?: number;
   alcoholPer100g?: number;
+  servingGrams?: number;
+  servingLabel?: string;
 }
 
 export interface Meal {

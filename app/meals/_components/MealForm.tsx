@@ -82,7 +82,11 @@ export default function MealForm({ onMealAdded, frequentMeals = [] }: Props) {
     setSuggestions(hits.slice(0, 6));
     const exact = foods.find((f) => f.foodName === foodName.trim());
     setMatched(exact ?? null);
-    if (!exact) setEstimate(null);
+    if (exact) {
+      setServings(1);
+    } else {
+      setEstimate(null);
+    }
   }, [foodName, foods]);
 
   async function handleParseLabel() {
@@ -150,16 +154,15 @@ export default function MealForm({ onMealAdded, frequentMeals = [] }: Props) {
         body: JSON.stringify({ foodName: foodName.trim(), ...estimate }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
-      const newFood: Food = { foodName: foodName.trim(), ...estimate };
-      // matched が設定された後も正しいグラム数で記録できるよう、
-      // servingEstimate をクリアして amount に反映する
-      const savedGrams = servingEstimate
-        ? Math.round(servingEstimate.servingGrams * servings)
-        : amount;
+      const newFood: Food = {
+        foodName: foodName.trim(),
+        ...estimate,
+        servingGrams: servingEstimate?.servingGrams,
+        servingLabel: servingEstimate?.servingLabel,
+      };
       setFoods((prev) => [...prev, newFood]);
       setShowSaveToMaster(false);
       setServingEstimate(null);
-      setAmount(savedGrams);
       setMessage("Foodsマスタに追加しました");
     } catch (e) {
       setMessage(`保存エラー: ${e instanceof Error ? e.message : String(e)}`);
@@ -184,7 +187,9 @@ export default function MealForm({ onMealAdded, frequentMeals = [] }: Props) {
 
   const effectiveAmount = servingEstimate && !matched
     ? Math.round(servingEstimate.servingGrams * servings)
-    : amount;
+    : matched?.servingGrams
+      ? Math.round(matched.servingGrams * servings)
+      : amount;
 
   const macros = quickMeal
     ? {
@@ -516,8 +521,37 @@ export default function MealForm({ onMealAdded, frequentMeals = [] }: Props) {
         </div>
       )}
 
-      {/* Amount (hidden in manual mode and serving estimate mode) */}
-      {!manualMode && !servingEstimate && (
+      {/* マスタにservingGramsがある場合はサービング数で選択 */}
+      {!manualMode && !servingEstimate && matched?.servingGrams && (
+        <div>
+          <p className="text-sm font-medium text-zinc-700 mb-1.5">
+            何{matched.servingLabel?.replace(/^[0-9]+/, "") ?? "食分"}食べましたか？
+            <span className="ml-1.5 text-xs text-zinc-400">
+              （{matched.servingLabel ?? "1食分"} = {matched.servingGrams}g）
+            </span>
+          </p>
+          <div className="flex gap-1.5 flex-wrap">
+            {[0.5, 1, 1.5, 2, 2.5, 3].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setServings(n)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  servings === n
+                    ? "bg-indigo-600 text-white"
+                    : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-xs text-zinc-400">{effectiveAmount}g</p>
+        </div>
+      )}
+
+      {/* Amount (serving情報なしの場合のgram入力) */}
+      {!manualMode && !servingEstimate && !matched?.servingGrams && (
         <div>
           <label className="block text-sm font-medium text-zinc-700 mb-1">量 (g)</label>
           <input

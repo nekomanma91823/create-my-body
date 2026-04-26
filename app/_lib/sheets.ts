@@ -45,6 +45,8 @@ const SHEET_CONFIGS: Record<string, string[]> = {
     "SugarPer100g",
     "SodiumPer100g",
     "AlcoholPer100g",
+    "ServingGrams",
+    "ServingLabel",
   ],
   Meals: [
     "Date",
@@ -234,6 +236,8 @@ export async function getFoods(): Promise<Food[]> {
     sugarPer100g: r.get("SugarPer100g") ? num(r.get("SugarPer100g")) : undefined,
     sodiumPer100g: r.get("SodiumPer100g") ? num(r.get("SodiumPer100g")) : undefined,
     alcoholPer100g: r.get("AlcoholPer100g") ? num(r.get("AlcoholPer100g")) : undefined,
+    servingGrams: r.get("ServingGrams") ? num(r.get("ServingGrams")) : undefined,
+    servingLabel: r.get("ServingLabel") ? str(r.get("ServingLabel")) : undefined,
   }));
 }
 
@@ -250,6 +254,8 @@ export async function updateFood(foodName: string, data: Partial<Omit<Food, "foo
   if (data.sugarPer100g !== undefined) row.set("SugarPer100g", data.sugarPer100g);
   if (data.sodiumPer100g !== undefined) row.set("SodiumPer100g", data.sodiumPer100g);
   if (data.alcoholPer100g !== undefined) row.set("AlcoholPer100g", data.alcoholPer100g);
+  if (data.servingGrams !== undefined) row.set("ServingGrams", data.servingGrams);
+  if (data.servingLabel !== undefined) row.set("ServingLabel", data.servingLabel);
   await row.save();
   return { foodName, ...data } as Food;
 }
@@ -274,6 +280,8 @@ export async function addFood(data: Food): Promise<Food> {
     SugarPer100g: data.sugarPer100g ?? "",
     SodiumPer100g: data.sodiumPer100g ?? "",
     AlcoholPer100g: data.alcoholPer100g ?? "",
+    ServingGrams: data.servingGrams ?? "",
+    ServingLabel: data.servingLabel ?? "",
   });
   return data;
 }
