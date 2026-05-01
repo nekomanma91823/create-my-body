@@ -228,6 +228,42 @@ export async function estimateNutrition(foodName: string): Promise<NutritionEsti
   return estimateWithServing(foodName);
 }
 
+export interface NutritionAdvice {
+  summary: string;
+  suggestions: { food: string; reason: string }[];
+}
+
+export async function getNutritionAdvice(
+  targets: { calories: number; protein: number; carbs: number; fat: number },
+  current: { calories: number; protein: number; carbs: number; fat: number },
+): Promise<NutritionAdvice> {
+  const ai = getAI();
+  const remaining = {
+    calories: Math.round(targets.calories - current.calories),
+    protein: Math.round((targets.protein - current.protein) * 10) / 10,
+    carbs: Math.round((targets.carbs - current.carbs) * 10) / 10,
+    fat: Math.round((targets.fat - current.fat) * 10) / 10,
+  };
+
+  const prompt = `今日の栄養摂取状況です。
+
+【目標】カロリー${targets.calories}kcal / タンパク質${targets.protein}g / 炭水化物${targets.carbs}g / 脂質${targets.fat}g
+【現在】カロリー${Math.round(current.calories)}kcal / タンパク質${Math.round(current.protein * 10) / 10}g / 炭水化物${Math.round(current.carbs * 10) / 10}g / 脂質${Math.round(current.fat * 10) / 10}g
+【残り】カロリー${remaining.calories}kcal / タンパク質${remaining.protein}g / 炭水化物${remaining.carbs}g / 脂質${remaining.fat}g
+
+残りのカロリー・栄養素を補うために、今日これから食べると良い具体的な食品を3〜4件提案してください。
+マイナスの場合はすでに超過しているため、その栄養素を増やさない食品を選んでください。
+
+JSON形式のみで返答（説明不要）:
+{"summary":"現状の簡潔な評価（1文）","suggestions":[{"food":"食品名と量の目安","reason":"この食品を選ぶ理由（短く）"}]}`;
+
+  const response = await ai.models.generateContent({ model: GEMINI_MODEL, contents: prompt });
+  const text = response.text ?? "";
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("Geminiから有効なJSONを取得できませんでした");
+  return JSON.parse(match[0]) as NutritionAdvice;
+}
+
 export async function suggestFoods(query: string): Promise<string[]> {
   const ai = getAI();
   const prompt = `ユーザーが「${query}」と入力しています。これに関連する日本の食品・料理名を5件提案してください。

@@ -50,6 +50,7 @@ export default function MealForm({ onMealAdded, frequentMeals = [] }: Props) {
   const [parsedLabel, setParsedLabel] = useState<ParsedNutritionLabel | null>(null);
   const [quickMeal, setQuickMeal] = useState<Meal | null>(null);
   const [savingToMaster, setSavingToMaster] = useState(false);
+  const [editingEstimate, setEditingEstimate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Food[]>([]);
@@ -433,17 +434,100 @@ export default function MealForm({ onMealAdded, frequentMeals = [] }: Props) {
 
           {servingEstimate && showSaveToMaster && !manualMode && !pasteMode && (
             <div className="space-y-3">
-              <div className="rounded-lg bg-white border border-amber-200 p-3">
-                <p className="text-xs text-amber-700 font-medium mb-1">
-                  AI推定: {servingEstimate.servingLabel}（約{servingEstimate.servingGrams}g）
-                </p>
-                <p className="text-xs text-amber-600">
-                  {Math.round(servingEstimate.caloriesPer100g * servingEstimate.servingGrams / 100)}kcal /
-                  P{Math.round(servingEstimate.proteinPer100g * servingEstimate.servingGrams / 100 * 10) / 10}g /
-                  C{Math.round(servingEstimate.carbsPer100g * servingEstimate.servingGrams / 100 * 10) / 10}g /
-                  F{Math.round(servingEstimate.fatPer100g * servingEstimate.servingGrams / 100 * 10) / 10}g
-                </p>
-              </div>
+              {editingEstimate ? (
+                <div className="rounded-lg bg-white border border-amber-300 p-3 space-y-3">
+                  <p className="text-xs font-medium text-amber-800">AI推定値を修正（100gあたり）</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs text-zinc-500 mb-0.5">単位ラベル</label>
+                      <input
+                        type="text"
+                        value={servingEstimate.servingLabel}
+                        onChange={(e) => setServingEstimate((p) => p && { ...p, servingLabel: e.target.value })}
+                        className="w-full rounded border border-zinc-300 px-2 py-1 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-500 mb-0.5">1食分 (g)</label>
+                      <input
+                        type="number" min={1}
+                        value={servingEstimate.servingGrams}
+                        onChange={(e) => setServingEstimate((p) => p && { ...p, servingGrams: Number(e.target.value) })}
+                        className="w-full rounded border border-zinc-300 px-2 py-1 text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {(["caloriesPer100g", "proteinPer100g", "carbsPer100g", "fatPer100g"] as const).map((key) => (
+                      <div key={key}>
+                        <label className="block text-xs text-zinc-500 mb-0.5">
+                          {key === "caloriesPer100g" ? "カロリー(kcal)" : key === "proteinPer100g" ? "タンパク質(g)" : key === "carbsPer100g" ? "炭水化物(g)" : "脂質(g)"}
+                        </label>
+                        <input
+                          type="number" min={0} step={0.1}
+                          value={servingEstimate[key]}
+                          onChange={(e) => {
+                            const v = parseFloat(e.target.value);
+                            setServingEstimate((p) => p && { ...p, [key]: isNaN(v) ? 0 : v });
+                            setEstimate((p) => p && { ...p, [key]: isNaN(v) ? 0 : v });
+                          }}
+                          className="w-full rounded border border-zinc-300 px-2 py-1 text-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {(["fiberPer100g", "sugarPer100g", "sodiumPer100g", "alcoholPer100g"] as const).map((key) => (
+                      <div key={key}>
+                        <label className="block text-xs text-zinc-500 mb-0.5">
+                          {key === "fiberPer100g" ? "食物繊維(g)" : key === "sugarPer100g" ? "糖質(g)" : key === "sodiumPer100g" ? "食塩(g)" : "アルコール(g)"}
+                          <span className="ml-1 text-zinc-400">任意</span>
+                        </label>
+                        <input
+                          type="number" min={0} step={0.01}
+                          value={servingEstimate[key] ?? ""}
+                          onChange={(e) => {
+                            const v = e.target.value === "" ? undefined : parseFloat(e.target.value);
+                            setServingEstimate((p) => p && { ...p, [key]: v });
+                            setEstimate((p) => p && { ...p, [key]: v });
+                          }}
+                          className="w-full rounded border border-zinc-300 px-2 py-1 text-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditingEstimate(false)}
+                    className="rounded-lg bg-amber-500 px-4 py-1.5 text-white text-xs font-medium hover:bg-amber-600"
+                  >
+                    確定
+                  </button>
+                </div>
+              ) : (
+                <div className="rounded-lg bg-white border border-amber-200 p-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs text-amber-700 font-medium mb-1">
+                        AI推定: {servingEstimate.servingLabel}（約{servingEstimate.servingGrams}g）
+                      </p>
+                      <p className="text-xs text-amber-600">
+                        {Math.round(servingEstimate.caloriesPer100g * servingEstimate.servingGrams / 100)}kcal /
+                        P{Math.round(servingEstimate.proteinPer100g * servingEstimate.servingGrams / 100 * 10) / 10}g /
+                        C{Math.round(servingEstimate.carbsPer100g * servingEstimate.servingGrams / 100 * 10) / 10}g /
+                        F{Math.round(servingEstimate.fatPer100g * servingEstimate.servingGrams / 100 * 10) / 10}g
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditingEstimate(true)}
+                      className="text-xs text-amber-500 hover:text-amber-700 shrink-0 ml-2"
+                    >
+                      ✏️ 値を修正
+                    </button>
+                  </div>
+                </div>
+              )}
               <div>
                 <p className="text-xs text-amber-800 font-medium mb-1.5">何{servingEstimate.servingLabel.replace(/^[0-9]+/, "")}食べましたか？</p>
                 <div className="flex gap-1.5 flex-wrap">
@@ -474,7 +558,7 @@ export default function MealForm({ onMealAdded, frequentMeals = [] }: Props) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setServingEstimate(null); setEstimate(null); setShowSaveToMaster(false); }}
+                  onClick={() => { setServingEstimate(null); setEstimate(null); setShowSaveToMaster(false); setEditingEstimate(false); }}
                   className="text-xs text-amber-500 hover:text-amber-700"
                 >
                   再推定

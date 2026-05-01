@@ -311,7 +311,33 @@ export async function getMeals(): Promise<Meal[]> {
     sodium: r.get("Sodium") ? num(r.get("Sodium")) : undefined,
     alcohol: r.get("Alcohol") ? num(r.get("Alcohol")) : undefined,
     source: str(r.get("Source")) as Meal["source"],
+    rowIndex: r.rowNumber,
   }));
+}
+
+export async function updateMeal(rowIndex: number, data: Partial<Omit<Meal, "rowIndex">>): Promise<void> {
+  const sheet = await getSheet("Meals");
+  const rows = await sheet.getRows();
+  const row = rows.find((r) => r.rowNumber === rowIndex);
+  if (!row) throw new Error("Meal row not found");
+  if (data.amount !== undefined) row.set("Amount", data.amount);
+  if (data.calories !== undefined) row.set("Calories", data.calories);
+  if (data.protein !== undefined) row.set("Protein", data.protein);
+  if (data.carbs !== undefined) row.set("Carbs", data.carbs);
+  if (data.fat !== undefined) row.set("Fat", data.fat);
+  if (data.fiber !== undefined) row.set("Fiber", data.fiber);
+  if (data.sugar !== undefined) row.set("Sugar", data.sugar);
+  if (data.sodium !== undefined) row.set("Sodium", data.sodium);
+  if (data.alcohol !== undefined) row.set("Alcohol", data.alcohol);
+  await row.save();
+}
+
+export async function deleteMeal(rowIndex: number): Promise<void> {
+  const sheet = await getSheet("Meals");
+  const rows = await sheet.getRows();
+  const row = rows.find((r) => r.rowNumber === rowIndex);
+  if (!row) throw new Error("Meal row not found");
+  await row.delete();
 }
 
 export async function addMeal(data: Meal): Promise<Meal> {

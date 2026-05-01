@@ -56,6 +56,7 @@ export interface Meal {
   sodium?: number;
   alcohol?: number;
   source: "master" | "gemini" | "manual";
+  rowIndex?: number;
 }
 
 export interface BodyMetric {

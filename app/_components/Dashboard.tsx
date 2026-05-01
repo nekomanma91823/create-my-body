@@ -12,6 +12,7 @@ import type {
   UserSettings,
 } from "@/app/_lib/types";
 import type { TrendPoint } from "@/app/_lib/calculations";
+import type { NutritionAdvice } from "@/app/_lib/gemini";
 
 interface Props {
   exercises: string[];
@@ -42,6 +43,30 @@ export default function Dashboard({
 }: Props) {
   const [selectedExercise, setSelectedExercise] = useState(exercises[0] ?? "");
   const trendChartData = trendsByExercise[selectedExercise] ?? [];
+  const [advice, setAdvice] = useState<NutritionAdvice | null>(null);
+  const [loadingAdvice, setLoadingAdvice] = useState(false);
+
+  async function fetchAdvice() {
+    if (!settings) return;
+    setLoadingAdvice(true);
+    setAdvice(null);
+    try {
+      const res = await fetch("/api/nutrition/advice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targets: { calories: settings.targetCalories, protein: settings.targetProtein, carbs: settings.targetCarbs, fat: settings.targetFat },
+          current: todayTotals,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      setAdvice(await res.json());
+    } catch (e) {
+      setAdvice({ summary: `エラー: ${e instanceof Error ? e.message : String(e)}`, suggestions: [] });
+    } finally {
+      setLoadingAdvice(false);
+    }
+  }
 
   const calorieRemaining = settings
     ? Math.max(settings.targetCalories - Math.round(todayTotals.calories), 0)
@@ -130,6 +155,69 @@ export default function Dashboard({
             </p>
           )}
         </section>
+
+        {/* ── 栄養ギャップ＆AIアドバイス ── */}
+        {settings && (
+          <section className="bg-white rounded-2xl border border-zinc-200 p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-zinc-800">今日の残り栄養</h2>
+              <button
+                onClick={fetchAdvice}
+                disabled={loadingAdvice}
+                className="rounded-xl bg-indigo-600 px-3 py-1.5 text-white text-xs font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              >
+                {loadingAdvice ? "AI分析中..." : "✨ AIにアドバイスをもらう"}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                { label: "カロリー", current: Math.round(todayTotals.calories), target: settings.targetCalories, unit: "kcal" },
+                { label: "タンパク質", current: Math.round(todayTotals.protein * 10) / 10, target: settings.targetProtein, unit: "g" },
+                { label: "炭水化物", current: Math.round(todayTotals.carbs * 10) / 10, target: settings.targetCarbs, unit: "g" },
+                { label: "脂質", current: Math.round(todayTotals.fat * 10) / 10, target: settings.targetFat, unit: "g" },
+              ].map(({ label, current, target, unit }) => {
+                const gap = Math.round((target - current) * 10) / 10;
+                const pct = Math.min((current / target) * 100, 100);
+                const over = current > target;
+                const color = over ? "text-red-500" : pct >= 80 ? "text-emerald-600" : pct >= 50 ? "text-amber-500" : "text-zinc-500";
+                const barColor = over ? "bg-red-400" : pct >= 80 ? "bg-emerald-400" : pct >= 50 ? "bg-amber-400" : "bg-zinc-300";
+                return (
+                  <div key={label} className="rounded-xl bg-zinc-50 border border-zinc-100 p-3">
+                    <p className="text-xs text-zinc-500 mb-1">{label}</p>
+                    <p className={`text-sm font-bold ${color}`}>
+                      {over ? `+${Math.abs(gap)}` : `あと ${gap}`}
+                      <span className="font-normal text-xs ml-0.5">{unit}</span>
+                    </p>
+                    <div className="mt-1.5 h-1.5 rounded-full bg-zinc-200 overflow-hidden">
+                      <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <p className="mt-0.5 text-xs text-zinc-400">{Math.round(pct)}% 達成</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {advice && (
+              <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-4 space-y-3">
+                <p className="text-sm font-medium text-indigo-800">{advice.summary}</p>
+                {advice.suggestions.length > 0 && (
+                  <div className="space-y-2">
+                    {advice.suggestions.map((s, i) => (
+                      <div key={i} className="flex gap-2 text-sm">
+                        <span className="shrink-0 text-indigo-400 font-bold">{i + 1}.</span>
+                        <div>
+                          <span className="font-medium text-indigo-900">{s.food}</span>
+                          <span className="text-indigo-600 ml-1.5 text-xs">{s.reason}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* ── 体重・カロリー推移 ── */}
         <section className="bg-white rounded-2xl border border-zinc-200 p-6">
